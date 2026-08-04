@@ -64,13 +64,24 @@ scambiabile.)*
 - Pagina statica di documentazione (Swagger UI, solo file statici, nessun
   servizio in più)
 
-## Fase 6 — Collaudo end-to-end
+## Fase 6 — Script sul Pi *(vive in fluxus-src, non qui)*
+- Nuovo file di segreti sul Pi (indirizzo Connect + token, stesso
+  trattamento di `.remote.conf`: separato, 0640)
+- Script di sincronizzazione — stessa struttura di `remote_sync.php` ma
+  verso Connect: ogni 2s invia lo stato, scarica la coda, esegue i comandi
+  via `fmCreateMarker()` (riusata, non reinventata) e conferma
+- Timer systemd dedicato, sul modello di `fm-remote-sync.timer`
+- Va lanciato da una conversazione radicata in `fluxus-src`, non qui: usa
+  come contratto l'API pubblicata dalla Fase 4/5 di questo repository.
+
+## Fase 7 — Collaudo end-to-end
 - Prima con richieste dirette (`curl`) al posto di una console vera, per
   isolare i problemi
 - Casi limite da provare esplicitamente: Connect irraggiungibile per un po',
   token revocato a metà sessione, comando rimasto in coda troppo a lungo
+- Richiede sia Connect (fasi 1-5) sia lo script sul Pi (fase 6) già pronti
 
-## Fase 7 — Prima integrazione reale e rilascio
+## Fase 8 — Prima integrazione reale e rilascio
 - Collegare una prima console esterna vera (anche minima) per validare
   l'intero flusso
 - Solo a questo punto: sezione dedicata in `docs/NOTE-TECNICHE.md` di
@@ -97,7 +108,7 @@ scambiabile.)*
 - **Limiti di frequenza (rate limiting)** sull'API pubblica — da aggiungere
   se e quando serve davvero, non preventivamente.
 
-Nota su fluxus-src: la comunicazione Pi→Connect (script di sincronizzazione,
-file di segreti, timer systemd) vive in quel repository, non in questo, e
-non ha ancora un numero di fase nella sua `ROADMAP.md` — da decidere quando
-si arriva a costruirla.
+Nota su fluxus-src: la Fase 6 sopra (script di sincronizzazione, file di
+segreti, timer systemd) vive in quel repository, non in questo, e non ha
+ancora un numero di fase nella sua `ROADMAP.md` — da decidere quando si
+arriva a costruirla.
