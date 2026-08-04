@@ -1,0 +1,8 @@
+# Dati reali di runtime: token, sotto-chiavi, code, stato dei tenant.
+# Non deve mai finire nel repository, in nessuna forma.
+/data/
+*.local.md
+
+# Editor/OS
+.DS_Store
+*.swp
