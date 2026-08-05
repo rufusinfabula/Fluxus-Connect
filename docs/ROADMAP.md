@@ -37,12 +37,15 @@ codice — niente procede di iniziativa.
 - Generazione chiavi ad alta entropia, verifica via hash a confronto
   costante
 
-## Fase 2 — Pannello di amministrazione → `0.2.0`
+## Fase 2 — Pannello di amministrazione → `0.2.0` *(rivista, vedi "Fase X")*
 - Login del proprietario
 - Creazione di un nuovo Pi: genera il token, mostrato una sola volta
 - Creazione/revoca sotto-chiavi per console, con nome e scope (`follow` /
   `follow+control`)
 - Log/attività per tenant
+- Creazione del proprietario: oltre a `bin/create-owner.php` (SSH), un
+  wizard al primo accesso se non esiste ancora un proprietario — decisione
+  e meccanismo in "Fase X" più sotto, implementazione non ancora fatta
 
 ## Fase 3 — API riservata per il Pi → `0.3.0`
 - Endpoint che riceve lo stato dal Pi (autenticato col token del Pi)
@@ -93,11 +96,71 @@ scambiabile.)*
   token revocato a metà sessione, comando rimasto in coda troppo a lungo
 - Richiede sia Connect (fasi 1-5) sia lo script sul Pi (fase 6) già pronti
 
-## Fase 8 — Prima integrazione reale e rilascio
+## Fase X — Autenticazione del proprietario senza terminale ✅ FATTO
+
+Non numerata di proposito: non è la prosecuzione lineare della roadmap, è
+una parentesi su una decisione di Fase 2 che si era rivelata incompleta.
+Implementazione scritta e collaudata: Fase 8 può ora procedere.
+
+- Problema: `bin/create-owner.php` (Fase 2) richiede accesso a riga di
+  comando (SSH), non garantito sull'hosting più economico — il vincolo
+  dichiarato nel README.
+- Decisione: creazione del proprietario al primo accesso, senza prova
+  preventiva di controllo del file system — stesso schema di WordPress e
+  simili. Se non esiste ancora un proprietario, il pannello mostra un form
+  di creazione invece del login; il primo invio valido lo crea e chiude la
+  porta per sempre. Rischio di corsa residuo accettato deliberatamente
+  (rilevamento quasi immediato, raggio di danno quasi nullo al primissimo
+  avvio, recupero — cancellare `data/owner.json` via FTP — che non
+  richiede capacità in più di quelle già necessarie per caricare il
+  codice), con un rafforzamento a costo marginale (`created_by_ip` e
+  `created_via` in `owner.json`). Scartate: file di configurazione
+  compilato via FTP prima del primo accesso e wizard con prova FTP
+  (stessa garanzia di sicurezza, più scomodi, senza vantaggio netto);
+  generazione da Fluxus, in entrambe le varianti discusse (in tensione con
+  "l'unico punto di contatto fra Fluxus e Connect è l'API pubblica
+  documentata" delle istruzioni locali del repository, e comunque non
+  risolve il caso generale multi-tenant). Motivazione completa, con le quattro alternative a
+  confronto, in [NOTE-TECNICHE.md](NOTE-TECNICHE.md), "Configurazione del
+  proprietario senza terminale".
+- Implementazione: `public/login.php` mostra il form di creazione al
+  posto del login quando `!fcOwnerExists()` (stessa protezione CSRF e
+  stessa validazione già in uso). `includes/owner.php` aggiunge
+  `fcOwnerCreateIfAbsent()`: scrive sotto lo stesso lock già usato da
+  `fcUpdateJsonFile()` e non sovrascrive mai un proprietario già esistente
+  — due submit quasi simultanei non possono corrompere `owner.json`, la
+  corsa "chi arriva prima" in sé resta il rischio accettato descritto
+  sopra. La stessa richiesta che crea il proprietario esegue anche il
+  login automatico (come al primo avvio di WordPress), scelta esplicita
+  fra le due indicate nel prompt di Fase X. `bin/create-owner.php` resta
+  invariato nel comportamento, solo il commento in testa menziona ora il
+  wizard come alternativa via browser. Test in `tests/admin_test.php`
+  (motore: creazione atomica, corsa persa, validazione) e nuovo
+  `tests/login_wizard_test.php` (HTTP end-to-end: form mostrato, CSRF,
+  redirect, nessuna riapertura dopo la creazione).
+
+## Fase 8 — Prima integrazione reale e rilascio ✅ FATTO (parte Connect)
+
 - Collegare una prima console esterna vera (anche minima) per validare
   l'intero flusso
 - Solo a questo punto: sezione dedicata in `docs/NOTE-TECNICHE.md` di
-  fluxus-src, ed eventuale voce nella sua `docs/ROADMAP.md`
+  fluxus-src, ed eventuale voce nella sua `docs/ROADMAP.md` — passo
+  successivo, in una conversazione radicata lì, non ancora fatto
+
+Validato con un consumatore reale (script PHP a polling, autenticato con
+una sotto-chiave `follow+control`) contro l'ambiente `fluxus-dev` già
+collegato dalla Fase 6: `GET /api/v1/follow/status.php` letto a intervalli
+riflette lo stato reale pubblicato ogni 2s dallo script sul Pi;
+`POST /api/v1/control/commands.php` ha depositato un marker realmente
+ritirato dal timer systemd `fluxus-dev-connect-sync` entro il giro
+successivo (visibile sia nel log di quello script sia nel log di attività
+del tenant), scartato correttamente perché nessuna registrazione era
+attiva in quel momento — stesso percorso di codice che gestirebbe un
+deposito andato a buon fine. Lo script della console non è entrato in
+questo repository: è un consumatore esterno usa-e-getta, non un prodotto
+da mantenere qui (stesso principio per cui Connect non assorbe i propri
+consumer — vedi "Decisioni già prese"). La sotto-chiave creata per la
+prova è stata revocata a validazione conclusa.
 
 ---
 

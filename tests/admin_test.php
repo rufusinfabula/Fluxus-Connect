@@ -131,6 +131,35 @@ fcCheck('nessuna attività per un tenant senza log', fcLogRead(str_repeat('0', 6
 echo "\nProprietario:\n";
 fcCheck('nessun proprietario prima della configurazione', !fcOwnerExists());
 
+// --- Creazione atomica (wizard web, Fase X) --------------------------------
+
+try {
+    fcOwnerCreateIfAbsent('admin', 'corta', null);
+    fcCheck('fcOwnerCreateIfAbsent: password troppo corta rifiutata', false);
+} catch (InvalidArgumentException $e) {
+    fcCheck('fcOwnerCreateIfAbsent: password troppo corta rifiutata', true);
+}
+fcCheck('nessun proprietario creato dopo un tentativo non valido', !fcOwnerExists());
+
+fcCheck(
+    'fcOwnerCreateIfAbsent riesce quando non esiste ancora un proprietario',
+    fcOwnerCreateIfAbsent('admin', 'una-password-lunga-abbastanza', '203.0.113.5') === true
+);
+$wizardOwner = fcOwnerRead();
+fcCheck('created_via registra "wizard"', $wizardOwner['created_via'] === 'wizard');
+fcCheck("created_by_ip registra l'indirizzo del chiamante", $wizardOwner['created_by_ip'] === '203.0.113.5');
+$createdAt = $wizardOwner['created_at'];
+
+fcCheck(
+    'una seconda fcOwnerCreateIfAbsent non sovrascrive (corsa persa: false)',
+    fcOwnerCreateIfAbsent('qualcun-altro', 'unaltra-password-lunghissima', '198.51.100.9') === false
+);
+$afterSecondAttempt = fcOwnerRead();
+fcCheck('username invariato dopo la corsa persa', $afterSecondAttempt['username'] === 'admin');
+fcCheck('created_at invariato dopo la corsa persa (nessuna sovrascrittura)', $afterSecondAttempt['created_at'] === $createdAt);
+
+// --- fcOwnerSetPassword (CLI): sovrascrive sempre, dietro conferma già a monte --
+
 try {
     fcOwnerSetPassword('admin', 'corta');
     fcCheck('password troppo corta rifiutata', false);
@@ -140,6 +169,10 @@ try {
 
 fcOwnerSetPassword('admin', 'una-password-lunga-abbastanza');
 fcCheck('il proprietario esiste dopo la configurazione', fcOwnerExists());
+$cliOwner = fcOwnerRead();
+fcCheck('fcOwnerSetPassword sovrascrive un proprietario già esistente', $cliOwner['created_at'] !== $createdAt);
+fcCheck('fcOwnerSetPassword registra created_via "cli" di default', $cliOwner['created_via'] === 'cli');
+fcCheck('fcOwnerSetPassword non registra un IP di default', $cliOwner['created_by_ip'] === null);
 
 // Due fallimenti prima del successo, per verificare che un login riuscito
 // azzeri il contatore invece di limitarsi a non incrementarlo.

@@ -5,6 +5,38 @@ Sotto l'1.0 il numero di versione coincide con la fase della roadmap (vedi
 questa — che restano nella versione della fase che estendono invece di
 aprirne una nuova, quando il cambio è additivo.
 
+## Fase 8 — Prima integrazione reale (parte Connect)
+
+Non un cambio di codice, quindi nessuna nuova versione: prima validazione
+dell'intero flusso pubblico con un consumatore reale (script a polling
+autenticato con sotto-chiave) contro l'ambiente `fluxus-dev`, già
+collegato dalla Fase 6. Confermato che `follow/status.php` e
+`control/commands.php` si comportano come da contratto anche fuori dai
+test automatici, in un giro completo Connect → coda → script sul Pi. Vedi
+[ROADMAP.md](ROADMAP.md).
+
+## Fase X — Autenticazione del proprietario senza terminale
+
+Non numerata di proposito (vedi [ROADMAP.md](ROADMAP.md)): parentesi su
+una decisione di Fase 2 rivelatasi incompleta, non la prosecuzione
+lineare della roadmap — non apre una nuova versione.
+
+`bin/create-owner.php` (Fase 2) richiedeva accesso a riga di comando
+(SSH), non garantito sull'hosting condiviso più economico. Ora
+`public/login.php` mostra un form "crea il proprietario" al posto del
+login quando non ne esiste ancora uno — stessa protezione CSRF, stessa
+validazione già in uso — e il primo invio valido lo crea, con login
+automatico, chiudendo la porta per sempre. `includes/owner.php` aggiunge
+`fcOwnerCreateIfAbsent()`, che scrive sotto lock e non sovrascrive mai un
+proprietario già esistente (due submit quasi simultanei non corrompono
+`owner.json`); `owner.json` registra anche `created_by_ip` e
+`created_via` (`'wizard'` o `'cli'`). `bin/create-owner.php` resta un
+percorso invariato, alternativo per chi ha SSH. Rischio di corsa residuo
+("chi arriva prima" fra il caricamento dei file e il primo visitatore)
+accettato deliberatamente — motivazione completa in
+[NOTE-TECNICHE.md](NOTE-TECNICHE.md), "Configurazione del proprietario
+senza terminale".
+
 ## 0.5.0
 
 Estensione multi-registrazione dell'API pubblica (fasi 4-5), per sbloccare

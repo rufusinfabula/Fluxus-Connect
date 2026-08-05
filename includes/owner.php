@@ -28,7 +28,9 @@ function fcOwnerExists(): bool
     return is_file(fcOwnerPath());
 }
 
-function fcOwnerSetPassword(string $username, string $password): void
+// Condivisa fra fcOwnerSetPassword() e fcOwnerCreateIfAbsent(): stessa
+// regola, un solo posto dove cambiarla.
+function fcOwnerValidateCredentials(string $username, string $password): string
 {
     $username = trim($username);
     if ($username === '') {
@@ -37,11 +39,23 @@ function fcOwnerSetPassword(string $username, string $password): void
     if (strlen($password) < 12) {
         throw new InvalidArgumentException('la password deve essere di almeno 12 caratteri');
     }
+    return $username;
+}
+
+// Usata da bin/create-owner.php: sovrascrive sempre (dietro conferma
+// esplicita già chiesta a riga di comando se un proprietario esiste già).
+// $createdVia distingue nel record chi ha creato le credenziali — vedi
+// docs/NOTE-TECNICHE.md, "Configurazione del proprietario senza terminale".
+function fcOwnerSetPassword(string $username, string $password, ?string $createdByIp = null, string $createdVia = 'cli'): void
+{
+    $username = fcOwnerValidateCredentials($username, $password);
 
     $data = [
         'username' => $username,
         'password_hash' => password_hash($password, PASSWORD_DEFAULT),
         'created_at' => fcTimestamp(),
+        'created_by_ip' => $createdByIp,
+        'created_via' => $createdVia,
         'failed_attempts' => 0,
         'locked_until' => null,
     ];
@@ -49,6 +63,40 @@ function fcOwnerSetPassword(string $username, string $password): void
         fcOwnerPath(),
         json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)
     );
+}
+
+// Usata dal wizard web (public/login.php) al primissimo accesso: a
+// differenza di fcOwnerSetPassword(), non sovrascrive mai un proprietario
+// già esistente. Scrive sotto lo stesso lock di fcUpdateJsonFile()
+// (storage.php), quindi due submit quasi simultanei non possono corrompere
+// owner.json: il primo a ottenere il lock crea, il secondo trova
+// 'username' già presente e non tocca nulla. Non impedisce la corsa "chi
+// arriva prima" in sé — quel rischio è accettato deliberatamente, vedi
+// docs/NOTE-TECNICHE.md — solo la corruzione da scrittura concorrente.
+// Restituisce true se questa chiamata ha creato il proprietario, false se
+// un'altra richiesta lo aveva già fatto nel frattempo (corsa persa).
+function fcOwnerCreateIfAbsent(string $username, string $password, ?string $createdByIp): bool
+{
+    $username = fcOwnerValidateCredentials($username, $password);
+
+    $created = false;
+    fcUpdateJsonFile(fcOwnerPath(), function (array $data) use ($username, $password, $createdByIp, &$created) {
+        if (isset($data['username'])) {
+            return $data; // già creato da un'altra richiesta: nessuna sovrascrittura
+        }
+        $created = true;
+        return [
+            'username' => $username,
+            'password_hash' => password_hash($password, PASSWORD_DEFAULT),
+            'created_at' => fcTimestamp(),
+            'created_by_ip' => $createdByIp,
+            'created_via' => 'wizard',
+            'failed_attempts' => 0,
+            'locked_until' => null,
+        ];
+    });
+
+    return $created;
 }
 
 function fcOwnerRead(): ?array

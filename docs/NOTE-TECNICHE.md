@@ -117,6 +117,99 @@ Pi tira sempre i dati, non li riceve mai in ingresso, quindi anche un token
 rubato può solo iniettare comandi falsi in coda, mai aprire una via di
 rientro diretta.
 
+## Configurazione del proprietario senza terminale
+
+Emerso preparando la Fase 8: `bin/create-owner.php` (Fase 2) è rimasto
+l'unico modo per impostare le credenziali del proprietario del pannello, e
+richiede accesso a riga di comando (SSH) — non garantito su una parte
+dell'hosting condiviso più economico, il vincolo dichiarato nel README.
+Quattro alternative valutate.
+
+### Scartata: file di configurazione compilato via FTP prima del primo accesso
+
+Un file (`data/owner.setup.php`, sul modello di `wp-config.php`) compilato
+a mano via FTP prima di aprire il sito, letto e consumato alla prima
+richiesta utile. Chiude del tutto la corsa "chi arriva prima" — nessuna
+finestra di rischio, nemmeno minima — ma il paragone con `wp-config.php`
+non regge fino in fondo: quel file esiste per credenziali di *database*
+spesso assegnate dall'hosting stesso, non per risolvere una corsa sulla
+registrazione dell'amministratore. Qui costringerebbe a editare a mano un
+array PHP dentro un client FTP, un passaggio scomodo e facile da sbagliare
+(virgole, apici, incoraggia copia-incolla di valori sbagliati) per
+eliminare un rischio che, come emerge sotto, è già basso di suo.
+
+### Scartata: wizard nel browser con prova di controllo file via FTP
+
+Stessa garanzia di sicurezza della precedente, in due passaggi (browser →
+FTP → browser) invece di uno, più uno stato intermedio (codice generato,
+con una sua scadenza) e un endpoint dedicato. Stesso costo della
+precedente, nessun vantaggio in più.
+
+### Scartata: generazione della configurazione da Fluxus
+
+Discussa in due varianti, entrambe scartate. La versione leggera (Fluxus
+scrive solo un piccolo file di configurazione in un formato documentato)
+resta in tensione con "l'unico punto di contatto fra Fluxus e Connect è
+l'API pubblica documentata" (istruzioni locali del repository) — un
+secondo canale non dichiarato fra i due prodotti. La versione più pesante, discussa per prima
+(Fluxus scarica temporaneamente da GitHub l'intero codice di Connect,
+inietta il file di credenziali, e lo ripacchetta per il download sul
+computer dell'utente, da caricare poi via FTP) aggrava il problema invece
+di risolverlo: Fluxus dovrebbe conoscere la struttura interna del repo di
+Connect e il suo processo di pacchettizzazione — nessuno dei due garantiti
+stabili verso l'esterno, a differenza dell'API versionata — e restare
+sincronizzato a ogni cambio di Connect, con due repository a
+versionamento indipendente (Fase 0). In più non risolve il caso generale:
+Connect è multi-tenant fin da subito, quindi il proprietario del pannello
+è una proprietà dell'installazione Connect, non di un singolo Pi — non è
+chiaro quale, fra più Fluxus che puntano alla stessa Connect, sarebbe
+"autorizzato" a generarlo, e l'idea non copre affatto un'installazione di
+Connect usata senza che nessun Fluxus l'abbia mai preceduta.
+
+### Scelta: creazione del proprietario al primo accesso, senza prova preventiva
+
+Stesso schema di WordPress, phpBB, Nextcloud e la gran parte delle
+applicazioni PHP self-hosted: se `fcOwnerExists()` è falso, il pannello
+mostra un form "crea il proprietario" (stessa validazione già in
+`fcOwnerSetPassword()`, stessa protezione CSRF del resto del pannello)
+invece del login; il primo invio valido crea il proprietario e chiude la
+porta per sempre — da quel momento la stessa rotta mostra login, non più
+un form di creazione, nessuna riapertura possibile via richiesta HTTP.
+
+Nessuna prova di controllo del file system, quindi in teoria una corsa
+esiste: chi scopre l'indirizzo prima del proprietario legittimo (per
+esempio dai log di Certificate Transparency, non serve altro) potrebbe
+inviare il form per primo. Accettata deliberatamente, per motivi specifici
+di come Connect viene messo in produzione — non un'accettazione generica
+del rischio:
+
+- **Rilevamento quasi immediato**: chi carica i file e visita il pannello
+  lo fa nello stesso momento, aspettandosi il form di creazione. Trovare
+  invece un login è un segnale immediato e inequivocabile, diverso da un
+  sito con mesi di traffico dove un account intruso può restare invisibile.
+- **Raggio di danno quasi nullo nella finestra**: è il primissimo avvio,
+  nessun Pi si è ancora registrato, nessun dato reale esiste da
+  raggiungere — il peggio che un occupante abusivo vede è una dashboard
+  vuota.
+- **Recupero senza capacità in più**: cancellare `data/owner.json` (via
+  FTP o file manager) e ripresentarsi riapre il form di creazione da capo.
+  Usa lo stesso accesso già necessario per caricare il codice — non
+  richiede SSH nemmeno nel caso limite, il vincolo che ha aperto questa
+  intera decisione resta rispettato anche nel percorso di recupero.
+
+Rafforzamento a costo marginale, incluso nella scelta: `owner.json` registra
+anche `created_by_ip` (e `created_via`: `'wizard'` o `'cli'`) al momento
+della creazione — non un log a parte, solo due campi in più sulla stessa
+struttura che già porta `created_at`. Non impedisce una corsa persa, ma dà
+al proprietario legittimo una conferma forense immediata se il login
+inatteso lo insospettisce, oltre al segnale già in sé sufficiente del punto
+sopra.
+
+`bin/create-owner.php` resta invariato: percorso alternativo per chi ha
+SSH, sia per la creazione iniziale sia per il recupero (sostituisce un
+proprietario esistente con conferma esplicita, comportamento già presente).
+Il meccanismo del wizard è additivo, non un rimpiazzo.
+
 ## Livello 1 — Follow (sola lettura)
 
 Endpoint concettuali sotto `/api/v1/follow/*` (namespace pubblico, distinto
@@ -235,6 +328,80 @@ lettura su `queue.php`: è API riservata al Pi, non pubblica, e già oggi
 non filtra il contenuto dei comandi (la whitelist si applica in scrittura,
 quando il comando viene depositato — vedi il commento in cima a quel
 file).
+
+## Comportamento nei casi limite (collaudato in Fase 7)
+
+La Fase 7 (collaudo end-to-end, condotta da `fluxus-src` con `connect_sync.php`
+reale contro un'istanza locale di Connect) ha verificato sul campo i tre casi
+limite che qualunque client del genere — non solo lo script di `fluxus-src` —
+deve saper attraversare senza bloccarsi né perdere dati. Non sono
+comportamenti impliciti: chiunque scriva un client diverso (un altro Fluxus,
+uno script di terzi) deve implementarli allo stesso modo, perché **Connect
+stesso non fa nulla per aiutare** in nessuno dei tre casi — si limita a
+rispondere in modo prevedibile a ogni singola richiesta, è compito del client
+gestire la sequenza nel tempo.
+
+### Connect irraggiungibile
+
+Dal punto di vista del client: la richiesta in uscita fallisce (timeout o
+connessione rifiutata) — Connect non ha modo di distinguere "il Pi è offline"
+da "il Pi non ha ancora richiamato", perché **non è lui a iniziare la
+comunicazione** (vedi "Broker, non proxy né bridge"). Nessuno stato lato
+Connect cambia: l'ultimo `status.json` pubblicato resta quello, "congelato",
+finché il client non torna a scrivere.
+
+Comportamento verificato in `connect_sync.php` (`fluxus-src`,
+`fccsRequest()`): l'eccezione di rete viene catturata e loggata
+(`fm-connect-sync.log`) senza propagarsi — un'interruzione di alcuni cicli non
+blocca né il polling successivo né, soprattutto, la registrazione in corso
+sul Pi (i due sono disaccoppiati: lo stato locale in SQLite non dipende da
+Connect). Al primo ciclo utile dopo il ritorno di Connect, la sincronizzazione
+riprende da sola — nessuna riconnessione esplicita da gestire, perché ogni
+ciclo è una richiesta HTTP indipendente, non una sessione persistente.
+
+### Sotto-chiave o token revocati a metà sessione
+
+Una revoca (dal pannello, per le sotto-chiavi — non ancora costruita
+un'interfaccia per revocare il token di primo livello di un Pi, vedi
+"Più avanti") ha effetto **immediato**: la richiesta in corso al momento
+della revoca completa con l'esito con cui era partita, ma la primissima
+richiesta successiva riceve `401` con corpo `{"error": "token non valido"}`
+(stesso messaggio sia per token del Pi sia per sotto-chiavi — non si
+distingue il motivo per non rivelare a un chiamante non autenticato se un
+identificativo è mai esistito). Nessun periodo di grazia, nessuna cache
+lato Connect.
+
+Verificato azzerando l'hash del token in `meta.json` del tenant mentre
+`connect_sync.php` girava: ogni ciclo lo ha registrato con un errore
+leggibile (`errore: POST /api/pi/status.php -> HTTP 401: {"error":"token non
+valido"}`), mai un fallimento silenzioso — e al ripristino dell'hash corretto
+la sincronizzazione è ripartita da sola al ciclo successivo, esattamente come
+nel caso di Connect irraggiungibile. Chi gestisce un'istanza deve leggere
+quel log per accorgersi di una revoca: Connect non manda altro avviso, e non
+può (il Pi non è mai raggiungibile in ingresso).
+
+### Un comando ritirato tardi, verso una registrazione già finita
+
+`GET /api/pi/queue.php` restituisce sempre l'intera coda, senza filtrare per
+validità corrente (vedi sopra) — è compito del client controllare, al momento
+di eseguire ciascun comando, se il suo `target_id` è ancora fra le
+registrazioni attive. Se il Pi ha smesso di ritirare per un po' (Connect
+irraggiungibile per minuti, o semplicemente un turno saltato) e nel frattempo
+la registrazione bersaglio è terminata, il comando arriva comunque, ma ormai
+"orfano".
+
+Verificato depositando un comando con `target_id` verso una registrazione
+attiva, fermando quella registrazione, e solo dopo lasciando che
+`connect_sync.php` la ritirasse: il comando viene **scartato e confermato**
+(`POST /api/pi/ack.php`) nello stesso ciclo, con una riga di log esplicita
+("target_id … non è (più) fra le registrazioni attive") — non un tentativo
+infinito, non un marker creato sulla registrazione sbagliata per errore. La
+console che lo ha depositato non riceve una notifica del mancato recapito:
+lo saprebbe solo interrogando di nuovo `follow/status.php` e non trovando il
+marker atteso — un limite noto, accettabile perché il raggio di danno di un
+marker mancante è basso (vedi la tabella del modello di sicurezza) e
+comunque non peggiore di quanto succedeva prima che questo controllo
+esistesse.
 
 ## Convenzioni per l'API pubblica
 

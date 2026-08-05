@@ -1,10 +1,12 @@
 #!/usr/bin/env php
 <?php
 // Fluxus Connect — crea o reimposta le credenziali del proprietario del
-// pannello. Unico modo per farlo: niente registrazione via web, perché
-// Connect è pensato per stare pubblicamente raggiungibile (vedi
-// docs/NOTE-TECNICHE.md) — una creazione self-service sarebbe una corsa a
-// chi arriva prima.
+// pannello, da riga di comando (SSH). Percorso alternativo al wizard nel
+// browser (public/login.php, mostrato al posto del login quando non esiste
+// ancora un proprietario — vedi docs/NOTE-TECNICHE.md, "Configurazione del
+// proprietario senza terminale"): utile su hosting con accesso SSH, sia per
+// la creazione iniziale sia per il recupero (sostituisce un proprietario
+// esistente con conferma esplicita, comportamento invariato qui sotto).
 //
 // Uso: php bin/create-owner.php [username]
 //      (la password si inserisce in modo interattivo, mai come
