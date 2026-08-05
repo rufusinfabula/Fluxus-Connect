@@ -6,9 +6,13 @@ privata) e sistemi esterni — console di regia, software di scaletta, o
 qualunque altro programma che voglia seguire o inviare istruzioni a una
 registrazione — senza che il Pi debba mai ricevere connessioni in ingresso.
 
-> **Stato: in progettazione.** Nessuna riga di codice ancora — repository
-> appena creato, con le decisioni di architettura discusse e la roadmap
-> definita. Vedi [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Stato: in sviluppo, fasi 1-5 completate (`0.5.0`).** Motore di storage,
+> pannello di amministrazione, API riservata al Pi e API pubblica per le
+> console esterne (con supporto multi-registrazione) sono scritti e
+> collaudati in una sandbox isolata — non ancora dietro un vero server web,
+> non ancora in produzione. Prossimo passo: lo script di sincronizzazione
+> sul Pi (Fase 6, vive nel repository di Fluxus). Vedi
+> [docs/ROADMAP.md](docs/ROADMAP.md) e [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ---
 
@@ -53,6 +57,8 @@ singolarmente.
 |---|---|
 | [Roadmap](docs/ROADMAP.md) | fasi di costruzione, cosa manca |
 | [Note tecniche](docs/NOTE-TECNICHE.md) | architettura, modello di sicurezza, perché file piatti e non un database |
+| [Changelog](docs/CHANGELOG.md) | cosa è cambiato in ogni versione |
+| [OpenAPI](public/docs/openapi.yaml) | contratto dell'API pubblica (anche navigabile via Swagger UI in `public/docs/`) |
 
 ## Relazione con gli altri prodotti Fluxus
 

@@ -1,0 +1,32 @@
+# Fluxus Connect — document root del pannello di amministrazione e dell'API.
+Options -Indexes
+
+<IfModule mod_authz_core.c>
+    Require all granted
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Allow from all
+</IfModule>
+
+# L'API riservata al Pi (public/api/pi/*.php) e l'API pubblica per le
+# console esterne (public/api/v1/*.php) leggono il token/sotto-chiave
+# dall'header Authorization — su molti hosting economici, dove PHP gira via
+# CGI/FastCGI
+# (PHP-FPM incluso) invece che come modulo Apache, quell'header non arriva a
+# PHP senza queste righe. CGIPassAuth è una direttiva core (non di
+# mod_cgi/mod_cgid), disponibile solo da Apache 2.4.13: il controllo di
+# versione evita un 500 sull'intera cartella se l'host è più vecchio — in
+# quel caso resta comunque la seconda riga (RewriteCond/RewriteRule), che
+# includes/api.php (fcApiBearerToken, via REDIRECT_HTTP_AUTHORIZATION) legge
+# come fallback.
+<IfModule mod_version.c>
+    <IfVersion >= 2.4.13>
+        CGIPassAuth On
+    </IfVersion>
+</IfModule>
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{HTTP:Authorization} ^(.+)$
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%1]
+</IfModule>

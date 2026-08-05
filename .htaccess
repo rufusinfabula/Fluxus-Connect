@@ -1,0 +1,12 @@
+# Fluxus Connect — solo public/ deve essere il document root del web
+# server. Se per errore di configurazione il document root punta invece
+# qui (radice del repository), questo blocca l'accesso diretto a
+# includes/, data/, docs/, tests/, bin/ — cartelle che contengono segreti
+# o logica interna, mai da servire direttamente.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order deny,allow
+    Deny from all
+</IfModule>

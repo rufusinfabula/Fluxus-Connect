@@ -63,6 +63,18 @@ scambiabile.)*
 - File OpenAPI per l'API della fase 4
 - Pagina statica di documentazione (Swagger UI, solo file statici, nessun
   servizio in più)
+- **Estensione multi-registrazione**, aggiunta prima di chiudere la fase
+  perché scoperta preparando la Fase 6: `GET /follow/status.php` espone
+  `registrations` (elenco delle registrazioni attive, Fluxus può
+  registrarne più di una alla volta), `POST /control/commands.php`
+  accetta `target_id` per indirizzare un comando a una registrazione
+  precisa (whitelist stretta contro quelle correntemente attive,
+  obbligatorio se ce n'è più di una — mai una scelta euristica di Connect
+  o del Pi), e l'oggetto in coda porta ora anche `subkey_name` (non solo
+  il log) così il Pi può mostrare da quale console è arrivato un comando.
+  Cambio additivo, non ha richiesto `/api/v2/`. Vedi
+  [NOTE-TECNICHE.md](NOTE-TECNICHE.md), "Multi-registrazione", e
+  [CHANGELOG.md](CHANGELOG.md).
 
 ## Fase 6 — Script sul Pi *(vive in fluxus-src, non qui)*
 - Nuovo file di segreti sul Pi (indirizzo Connect + token, stesso

@@ -1,0 +1,469 @@
+openapi: 3.0.3
+info:
+  title: Fluxus Connect — API pubblica
+  version: "0.5.0"
+  description: |
+    API pubblica di Fluxus Connect (Fase 4 della roadmap), per sistemi
+    esterni — console di regia, software di scaletta — che vogliono
+    seguire o inviare istruzioni a una registrazione Fluxus senza mai
+    raggiungere direttamente il Pi, che resta in rete privata.
+
+    Documenta solo ciò che esiste ed è collaudato oggi: lettura dello
+    stato (`follow`) e deposito di un comando marker/cue (`controllo`).
+    Avvio/stop registrazione da remoto **non** sono previsti in questa
+    versione dell'API — restano PENDING/FUTURO, vedi
+    `docs/ROADMAP.md` e `docs/NOTE-TECNICHE.md` nel repository sorgente.
+
+    Fluxus può registrare da più sorgenti contemporaneamente: `registrations`
+    in `FollowStatus` elenca tutte le registrazioni attive, e `target_id`
+    in `CommandRequest` indica a quale delle registrazioni elencate si
+    applica un comando — obbligatorio quando più di una è attiva. La
+    scelta del bersaglio spetta sempre a chi chiama, mai a un'euristica di
+    Connect o del Pi. Vedi `docs/NOTE-TECNICHE.md`, "Follow
+    multi-registrazione" e "Comando con bersaglio esplicito", per il
+    perché di questa forma additiva (nessuna `/api/v2/` necessaria: i
+    campi in cima a `FollowStatus` restano compatibili con chi ha
+    integrato prima di questa estensione).
+
+    Non documenta l'API riservata al Pi (`/api/pi/...`, Fase 3): quella
+    si autentica col token di primo livello del Pi, mai con una
+    sotto-chiave, e non è pensata per essere consumata da terzi.
+  contact:
+    name: Fluxus Connect
+servers:
+  - url: /api/v1
+    description: >-
+      Radice dell'API pubblica, relativa al dominio su cui è installata
+      questa istanza di Fluxus Connect. Un'incompatibilità futura aprirà
+      una /api/v2/ separata, invece di rompere silenziosamente le
+      integrazioni esistenti.
+tags:
+  - name: follow
+    description: Lettura dello stato pubblicato dal Pi (sola lettura).
+  - name: control
+    description: Deposito di comandi nella coda che il Pi ritira al polling successivo.
+paths:
+  /follow/status.php:
+    get:
+      operationId: getFollowStatus
+      tags: [follow]
+      summary: Legge l'ultimo stato pubblicato dal Pi
+      description: |
+        Restituisce lo specchio di sola lettura dell'ultimo stato che il
+        Pi ha pubblicato (via la sua API riservata, non esposta qui).
+        Se il Pi non ha ancora pubblicato nulla, `state` vale `"unknown"`
+        e nessun altro campo oltre a `node_name` e `registrations`
+        (vuoto) è presente.
+
+        `registrations` elenca tutte le registrazioni attualmente attive
+        — Fluxus può registrare da più sorgenti insieme. I campi in cima
+        alla risposta (`state`, `id`, `source`, `media_type`,
+        `started_at`, `elapsed_seconds`, `marker_count`) restano per
+        compatibilità con chi ha integrato questo endpoint prima che
+        esistesse `registrations`: rispecchiano la prima registrazione
+        dell'elenco così come pubblicata dal Pi, non una scelta di
+        Connect su quale sia "la" registrazione che conta. Con più di una
+        registrazione attiva quello specchio in cima non basta più a
+        rappresentare la situazione per intero — usare `registrations`
+        per vederle tutte, o per scegliere il `target_id` di un comando.
+
+        Whitelist in lettura applicata anche qui, in aggiunta a quella
+        già imposta in scrittura dall'API riservata al Pi (difesa in
+        profondità): campi come percorsi filesystem, PID, note interne o
+        configurazione delle sorgenti non vengono mai restituiti, anche
+        se per errore finissero su disco.
+      security:
+        - subkeyAuth: []
+      responses:
+        "200":
+          description: Stato letto con successo (anche se `state` è `"unknown"`).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FollowStatus"
+              examples:
+                unaRegistrazione:
+                  summary: Una sola registrazione in corso
+                  value:
+                    node_name: "Pi di test"
+                    state: "in registrazione"
+                    id: "rec-a1b2c3"
+                    source: "ingresso-1"
+                    media_type: "video"
+                    started_at: "2026-08-04T10:00:00Z"
+                    elapsed_seconds: 42
+                    marker_count: 3
+                    received_at: "2026-08-04T10:00:42.000000Z"
+                    registrations:
+                      - id: "rec-a1b2c3"
+                        state: "in registrazione"
+                        source: "ingresso-1"
+                        media_type: "video"
+                        started_at: "2026-08-04T10:00:00Z"
+                        elapsed_seconds: 42
+                        marker_count: 3
+                pluriRegistrazione:
+                  summary: Più registrazioni attive contemporaneamente
+                  value:
+                    node_name: "Pi di test"
+                    state: "in registrazione"
+                    id: "rec-a1b2c3"
+                    source: "ingresso-1"
+                    media_type: "video"
+                    started_at: "2026-08-04T10:00:00Z"
+                    elapsed_seconds: 42
+                    marker_count: 3
+                    received_at: "2026-08-04T10:00:42.000000Z"
+                    registrations:
+                      - id: "rec-a1b2c3"
+                        state: "in registrazione"
+                        source: "ingresso-1"
+                        media_type: "video"
+                        started_at: "2026-08-04T10:00:00Z"
+                        elapsed_seconds: 42
+                        marker_count: 3
+                      - id: "rec-d4e5f6"
+                        state: "in registrazione"
+                        source: "ingresso-2"
+                        media_type: "audio"
+                        started_at: "2026-08-04T10:05:00Z"
+                        elapsed_seconds: 12
+                        marker_count: 0
+                nessunoStatoPubblicato:
+                  summary: Nessuno stato ancora pubblicato dal Pi
+                  value:
+                    node_name: "Pi di test"
+                    state: "unknown"
+                    registrations: []
+        "401":
+          description: >-
+            Sotto-chiave mancante, malformata, inesistente o revocata.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                mancante:
+                  value:
+                    error: "sotto-chiave mancante o malformata (atteso: Authorization: Bearer <sotto-chiave>)"
+                nonValida:
+                  value:
+                    error: "sotto-chiave non valida"
+                revocata:
+                  value:
+                    error: "sotto-chiave revocata"
+        "405":
+          description: Metodo diverso da GET.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "metodo non consentito, atteso GET"
+  /control/commands.php:
+    post:
+      operationId: postControlCommand
+      tags: [control]
+      summary: Deposita un comando (marker o cue) nella coda del Pi
+      description: |
+        Deposita un comando nella coda del tenant autenticato dalla
+        sotto-chiave. Il Pi la ritira al giro di polling successivo
+        (Fase 6, non ancora costruita) e la conferma tramite la propria
+        API riservata — questo endpoint non attende né garantisce
+        l'esecuzione, solo il deposito in coda.
+
+        Whitelist stretta sul campo `type`: solo `marker` e `cue`.
+        Avvio/stop registrazione restano PENDING/FUTURO per il raggio di
+        danno più alto di un comando in ritardo di polling — vedi
+        `docs/NOTE-TECNICHE.md`.
+
+        Richiede lo scope `follow+control`: una sotto-chiave con solo
+        `follow` viene rifiutata con 403.
+
+        Se più di una registrazione è attiva contemporaneamente (vedi
+        `registrations` in `GET /follow/status.php`), `target_id` è
+        **obbligatorio** e deve corrispondere a una di quelle
+        registrazioni — un valore che non è fra quelle correntemente
+        attive viene rifiutato con 400, stessa whitelist stretta già
+        applicata a `type`. Con una sola registrazione attiva `target_id`
+        è facoltativo: Connect lo assegna da sé a quell'unica
+        registrazione (non è un'euristica, è l'unica scelta possibile).
+        Con nessuna registrazione attiva il comando viene comunque
+        accettato, senza bersaglio.
+      security:
+        - subkeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommandRequest"
+            examples:
+              marker:
+                summary: Marker con etichetta (nessuna o una sola registrazione attiva)
+                value:
+                  type: "marker"
+                  label: "Ingresso ospite"
+              cue:
+                summary: Cue senza etichetta
+                value:
+                  type: "cue"
+              markerConBersaglio:
+                summary: Marker verso una registrazione precisa (più di una attiva)
+                value:
+                  type: "marker"
+                  label: "Ingresso ospite"
+                  target_id: "rec-a1b2c3"
+      responses:
+        "200":
+          description: Comando accodato con successo.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandAccepted"
+              example:
+                ok: true
+                id: "20260804T210000.000000Z-a1b2c3d4"
+        "400":
+          description: >-
+            Corpo della richiesta mancante, non JSON, `type`/`label` non
+            validi (`type` deve essere `marker` o `cue`; `label`, se
+            presente, deve essere una stringa di al più 500 caratteri),
+            oppure `target_id` mancante (con più registrazioni attive) o
+            non fra quelle correntemente attive.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                corpoVuoto:
+                  value:
+                    error: "corpo della richiesta mancante o vuoto"
+                corpoNonJson:
+                  value:
+                    error: "corpo della richiesta non è un oggetto JSON valido"
+                typeMancanteOInvalido:
+                  value:
+                    error: "campo 'type' obbligatorio: ammessi solo marker, cue"
+                labelNonStringa:
+                  value:
+                    error: "campo 'label' deve essere una stringa"
+                labelTroppoLunga:
+                  value:
+                    error: "campo 'label' troppo lungo (massimo 500 caratteri)"
+                targetIdMancante:
+                  summary: target_id omesso con più registrazioni attive
+                  value:
+                    error: "campo 'target_id' obbligatorio: più di una registrazione è attualmente attiva (rec-a1b2c3, rec-d4e5f6)"
+                targetIdNonValido:
+                  summary: target_id fuori whitelist
+                  value:
+                    error: "campo 'target_id' non valido: registrazioni attive: rec-a1b2c3, rec-d4e5f6"
+        "401":
+          description: Sotto-chiave mancante, malformata, inesistente o revocata.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                mancante:
+                  value:
+                    error: "sotto-chiave mancante o malformata (atteso: Authorization: Bearer <sotto-chiave>)"
+                nonValida:
+                  value:
+                    error: "sotto-chiave non valida"
+                revocata:
+                  value:
+                    error: "sotto-chiave revocata"
+        "403":
+          description: >-
+            Sotto-chiave valida ma con scope `follow` soltanto — il
+            controllo richiede `follow+control`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "sotto-chiave senza i permessi necessari per questa richiesta"
+        "405":
+          description: Metodo diverso da POST.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "metodo non consentito, atteso POST"
+components:
+  securitySchemes:
+    subkeyAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: sotto-chiave
+      description: >-
+        Sotto-chiave generata dal pannello di amministrazione per una
+        console/sistema esterno specifico — mai il token di primo
+        livello del Pi. Va inviata come `Authorization: Bearer
+        <sotto-chiave>`. Ogni sotto-chiave ha uno scope fisso (`follow`
+        o `follow+control`) assegnato alla creazione e revocabile
+        singolarmente senza toccare le altre sotto-chiavi dello stesso
+        Pi.
+  schemas:
+    FollowStatus:
+      type: object
+      description: >-
+        Specchio di sola lettura dell'ultimo stato pubblicato dal Pi.
+        `node_name`, `state` e `registrations` sono sempre presenti (lo
+        stato è `"unknown"` e `registrations` è vuoto se il Pi non ha
+        ancora pubblicato nulla). Gli altri campi in cima
+        (`id`/`source`/`media_type`/`started_at`/`elapsed_seconds`/
+        `marker_count`) sono un mirror di sola compatibilità della prima
+        voce di `registrations`, mantenuto per chi ha integrato questo
+        endpoint prima che esistesse il supporto multi-registrazione —
+        vedi `registrations` per la lista completa e per scegliere il
+        `target_id` di un comando.
+      required: [node_name, state, registrations]
+      properties:
+        node_name:
+          type: string
+          nullable: true
+          description: Nome del Pi assegnato alla creazione del tenant.
+          example: "Pi di test"
+        state:
+          type: string
+          description: >-
+            Stato della prima registrazione attiva, così come riportato
+            dal Pi (stringa libera, non un enum fisso), oppure
+            `"unknown"` se nessuna registrazione è attiva. Mirror di
+            compatibilità: vedi `registrations` per lo stato di ciascuna
+            registrazione.
+          example: "in registrazione"
+        id:
+          type: string
+          description: >-
+            Mirror di compatibilità dell'`id` della prima registrazione
+            in `registrations`, se presente.
+        source:
+          type: string
+          description: >-
+            Mirror di compatibilità della `source` della prima
+            registrazione in `registrations`, se presente.
+          example: "ingresso-1"
+        media_type:
+          type: string
+          description: Mirror di compatibilità, vedi `registrations`.
+          example: "video"
+        started_at:
+          type: string
+          description: Mirror di compatibilità, vedi `registrations`.
+          example: "2026-08-04T10:00:00Z"
+        elapsed_seconds:
+          type: integer
+          minimum: 0
+          description: Mirror di compatibilità, vedi `registrations`.
+          example: 42
+        marker_count:
+          type: integer
+          minimum: 0
+          description: Mirror di compatibilità, vedi `registrations`.
+          example: 3
+        registrations:
+          type: array
+          description: >-
+            Tutte le registrazioni attualmente attive — Fluxus può
+            registrare da più sorgenti insieme. Vuoto se nessuna
+            registrazione è in corso.
+          items:
+            $ref: "#/components/schemas/Registration"
+        received_at:
+          type: string
+          description: >-
+            Timestamp con cui Connect ha ricevuto e salvato questo
+            stato (non generato dal Pi). Assente se il Pi non ha ancora
+            pubblicato nulla.
+          example: "2026-08-04T10:00:42.000000Z"
+    Registration:
+      type: object
+      description: >-
+        Una singola registrazione attiva, così come pubblicata dal Pi.
+        L'`id` è il valore da usare come `target_id` in
+        `POST /control/commands.php` per indirizzare un comando a questa
+        registrazione precisa.
+      required: [id, state]
+      properties:
+        id:
+          type: string
+          description: >-
+            Identificativo stabile della registrazione, assegnato dal
+            Pi. Univoco fra le registrazioni pubblicate nello stesso
+            momento.
+          example: "rec-a1b2c3"
+        state:
+          type: string
+          description: Stato di questa registrazione, riportato dal Pi (stringa libera).
+          example: "in registrazione"
+        source:
+          type: string
+          description: Sorgente di questa registrazione, così come riportata dal Pi.
+          example: "ingresso-1"
+        media_type:
+          type: string
+          example: "video"
+        started_at:
+          type: string
+          description: Timestamp di inizio di questa registrazione, riportato dal Pi.
+          example: "2026-08-04T10:00:00Z"
+        elapsed_seconds:
+          type: integer
+          minimum: 0
+          example: 42
+        marker_count:
+          type: integer
+          minimum: 0
+          example: 3
+    CommandRequest:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [marker, cue]
+          description: >-
+            Whitelist stretta: solo questi due valori sono accettati.
+            Avvio/stop restano PENDING/FUTURO.
+        label:
+          type: string
+          maxLength: 500
+          description: >-
+            Etichetta opzionale, ripulita dagli spazi iniziali/finali.
+            Se vuota dopo il trim non viene salvata affatto.
+          example: "Ingresso ospite"
+        target_id:
+          type: string
+          description: >-
+            L'`id` della registrazione (fra quelle elencate in
+            `registrations` da `GET /follow/status.php`) a cui si
+            applica questo comando. Obbligatorio se più di una
+            registrazione è attiva; facoltativo con una sola
+            registrazione attiva (assegnata automaticamente); ignorato
+            se nessuna registrazione è attiva. Un valore che non
+            corrisponde a una registrazione correntemente attiva viene
+            rifiutato con 400 — whitelist stretta, come per `type`.
+          example: "rec-a1b2c3"
+    CommandAccepted:
+      type: object
+      required: [ok, id]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        id:
+          type: string
+          description: Identificativo del comando in coda, assegnato da Connect.
+          example: "20260804T210000.000000Z-a1b2c3d4"
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: Messaggio d'errore in italiano, pensato per il log del chiamante.
