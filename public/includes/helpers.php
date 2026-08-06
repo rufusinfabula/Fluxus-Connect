@@ -6,6 +6,18 @@ function fcE(?string $s): string
     return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8');
 }
 
+// Numero di versione da VERSION alla radice del repository — fonte unica,
+// mostrata in intestazione e footer del pannello.
+function fcAppVersion(): string
+{
+    static $version = null;
+    if ($version === null) {
+        $raw = @file_get_contents(__DIR__ . '/../../VERSION');
+        $version = $raw === false ? '' : trim($raw);
+    }
+    return $version;
+}
+
 // Legge un valore "usa e getta" dalla sessione (es. il token appena
 // generato, mostrato una sola volta) e lo rimuove subito dopo — un
 // secondo refresh della stessa pagina non lo mostra più.

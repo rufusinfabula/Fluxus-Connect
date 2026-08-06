@@ -6,13 +6,11 @@ privata) e sistemi esterni — console di regia, software di scaletta, o
 qualunque altro programma che voglia seguire o inviare istruzioni a una
 registrazione — senza che il Pi debba mai ricevere connessioni in ingresso.
 
-> **Stato: fasi 1-8 completate (`0.5.1`).** Motore di storage, pannello di
-> amministrazione, API riservata al Pi e API pubblica per le console esterne
-> (con supporto multi-registrazione) sono scritti, collaudati end-to-end e
-> in uso reale: lo script di sincronizzazione sul Pi (Fase 6, in
-> `fluxus-src`) e una prima console esterna vera sono collegati. In
-> valutazione, senza codice scritto finché non c'è una decisione esplicita:
-> nuove proposte di API (Fase Z). Vedi [docs/ROADMAP.md](docs/ROADMAP.md) e
+> **Versione `1.0.0` — rilasciato.** Motore di storage, pannello di
+> amministrazione, API riservata al Pi e API pubblica per le console
+> esterne (con supporto multi-registrazione) sono scritti, collaudati
+> end-to-end e in uso reale: lo script di sincronizzazione sul Pi e una
+> console esterna vera sono collegati. Vedi
 > [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ---
@@ -56,8 +54,6 @@ singolarmente.
 
 | | |
 |---|---|
-| [Roadmap](docs/ROADMAP.md) | fasi di costruzione, cosa manca |
-| [Note tecniche](docs/NOTE-TECNICHE.md) | architettura, modello di sicurezza, perché file piatti e non un database |
 | [Changelog](docs/CHANGELOG.md) | cosa è cambiato in ogni versione |
 | [OpenAPI](public/docs/openapi.yaml) | contratto dell'API pubblica (anche navigabile via Swagger UI in `public/docs/`) |
 
@@ -68,10 +64,7 @@ singolarmente.
   contrario.
 - **Fluxus Remote** — relay indipendente già esistente per marker/cue da
   fuori LAN, con propria interfaccia. Resta un prodotto a sé: non gira
-  dentro Connect né viene assorbito da esso. Una futura riscrittura
-  (`Remote 1.5`, repository a parte) potrebbe usare l'API pubblica di
-  Connect al posto della propria logica di coda — vedi la sezione *Più
-  avanti* della [roadmap](docs/ROADMAP.md).
+  dentro Connect né viene assorbito da esso.
 
 ## Licenza
 

@@ -1,9 +1,23 @@
 # Changelog — Fluxus Connect
 
-Sotto l'1.0 il numero di versione coincide con la fase della roadmap (vedi
-[ROADMAP.md](ROADMAP.md)), salvo estensioni a una fase già chiusa — come
-questa — che restano nella versione della fase che estendono invece di
-aprirne una nuova, quando il cambio è additivo.
+Da `1.0.0` il progetto segue il versionamento semantico: `1.0.1`, `1.0.2`,
+... per correzioni minori; `1.1.0`, `1.2.0`, ... per evoluzioni di media
+entità. Le voci precedenti alla `1.0.0` riflettono il processo di sviluppo
+a fasi con cui il progetto è stato costruito (numerate o con nome, es.
+"Fase X") — restano qui come cronologia, anche se quello schema non è più
+in uso.
+
+## 1.0.0
+
+Primo rilascio definitivo: Fluxus Connect è completo e pronto per l'uso in
+produzione. Motore di storage, pannello di amministrazione, API riservata
+al Pi, API pubblica versionata (`/api/v1/`) con supporto
+multi-registrazione, documentazione OpenAPI e una prima integrazione reale
+sono tutti scritti, collaudati end-to-end e in uso. Aggiunto un file
+`VERSION` alla radice del repository, fonte unica del numero di versione;
+il pannello ora mostra la versione nell'intestazione e in un footer con
+anno corrente e credito. Nessun cambio al contratto pubblico rispetto alla
+`0.5.2`.
 
 ## 0.5.2
 
@@ -14,14 +28,14 @@ usato per il token dell'istanza quando lo si rigenera — facile confondere
 i due. Il segreto di una sotto-chiave ora appare dentro la sua riga
 nell'elenco, col nome della console; il banner in cima resta riservato al
 solo token dell'istanza. Nessun cambio al modello dati (`includes/subkeys.php`
-invariato) né al contratto pubblico. Vedi [ROADMAP.md](ROADMAP.md), Fase Z.
+invariato) né al contratto pubblico.
 
 ## 0.5.1
 
 Correzioni minori nel codice di Connect, emerse durante il collaudo
 end-to-end (Fase 7): impatto trascurabile, nessun cambio al contratto
 pubblico (`/api/v1/...` invariato, `public/docs/openapi.yaml` resta alla
-`0.5.0`). Vedi [ROADMAP.md](ROADMAP.md), Fase 7.
+`0.5.0`).
 
 ## Fase W — Avvio di Fluxus Remote 1.5 (decisione)
 
@@ -31,10 +45,8 @@ Fluxus Remote annunciata in "Più avanti" fin dall'impalcatura iniziale. La
 condizione posta allora (attendere un margine di uso reale di Connect dopo
 la Fase 8) è stata derogata esplicitamente dal proprietario del progetto.
 Documentazione e prompt di avvio soltanto — nessun codice applicativo
-scritto qui. Vedi [ROADMAP.md](ROADMAP.md) e
-[NOTE-TECNICHE.md](NOTE-TECNICHE.md), "Fluxus Remote 1.5 — cosa deve
-sapere la conversazione che lo costruisce", e `PROMPTS.local.md` (non
-versionato) per il prompt stesso.
+scritto qui. Il contratto che Remote 1.5 deve rispettare resta quello
+già pubblicato in `public/docs/openapi.yaml`.
 
 ## Fase Y — `whoami.php`
 
@@ -42,7 +54,7 @@ Nuovo endpoint `GET /api/pi/whoami.php` (autenticato col token di primo
 livello, come `status.php`/`queue.php`/`ack.php`): risponde
 `{"subkeys": [...]}` con le sotto-chiavi attive del tenant, per il
 pulsante "Testa connessione" del pannello di Fluxus — endpoint già atteso
-da quel lato ma mai costruito qui. Vedi [ROADMAP.md](ROADMAP.md).
+da quel lato ma mai costruito qui.
 
 ## Fase 8 — Prima integrazione reale (parte Connect)
 
@@ -51,12 +63,11 @@ dell'intero flusso pubblico con un consumatore reale (script a polling
 autenticato con sotto-chiave) contro l'ambiente `fluxus-dev`, già
 collegato dalla Fase 6. Confermato che `follow/status.php` e
 `control/commands.php` si comportano come da contratto anche fuori dai
-test automatici, in un giro completo Connect → coda → script sul Pi. Vedi
-[ROADMAP.md](ROADMAP.md).
+test automatici, in un giro completo Connect → coda → script sul Pi.
 
 ## Fase X — Autenticazione del proprietario senza terminale
 
-Non numerata di proposito (vedi [ROADMAP.md](ROADMAP.md)): parentesi su
+Non numerata di proposito: parentesi su
 una decisione di Fase 2 rivelatasi incompleta, non la prosecuzione
 lineare della roadmap — non apre una nuova versione.
 
@@ -72,18 +83,15 @@ proprietario già esistente (due submit quasi simultanei non corrompono
 `created_via` (`'wizard'` o `'cli'`). `bin/create-owner.php` resta un
 percorso invariato, alternativo per chi ha SSH. Rischio di corsa residuo
 ("chi arriva prima" fra il caricamento dei file e il primo visitatore)
-accettato deliberatamente — motivazione completa in
-[NOTE-TECNICHE.md](NOTE-TECNICHE.md), "Configurazione del proprietario
-senza terminale".
+accettato deliberatamente — motivazione completa nelle note tecniche interne del progetto.
 
 ## 0.5.0
 
 Estensione multi-registrazione dell'API pubblica (fasi 4-5), per sbloccare
 la Fase 6 (script sul Pi, in `fluxus-src`): Fluxus può registrare da più
 sorgenti contemporaneamente, e oggi il contratto assumeva una sola
-registrazione attiva per Pi. Vedi [NOTE-TECNICHE.md](NOTE-TECNICHE.md),
-sezione "Multi-registrazione", per il ragionamento completo dietro ogni
-scelta.
+registrazione attiva per Pi. Ragionamento completo dietro ogni scelta nelle note tecniche interne del
+progetto.
 
 ### Aggiunto
 
@@ -121,7 +129,7 @@ scelta.
 
 - Nessuna nuova versione dell'indirizzo pubblico (`/api/v2/`): il cambio
   su `follow/status.php` e `control/commands.php` è additivo, non
-  distruttivo — vedi il ragionamento in NOTE-TECNICHE.md.
+  distruttivo.
 
 ## 0.4.0
 

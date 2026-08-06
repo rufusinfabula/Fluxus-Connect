@@ -16,7 +16,11 @@
 <body>
 <header class="fc-header">
   <div class="fc-header-inner">
-    <a class="fc-brand" href="dashboard.php"><img class="fc-brand-icon" src="icons/fluxus-connect-64.png" alt="" width="24" height="24">Fluxus Connect</a>
+    <a class="fc-brand" href="dashboard.php">
+      <img class="fc-brand-icon" src="icons/fluxus-connect-64.png" alt="" width="24" height="24">
+      <span class="fc-brand-name">Fluxus Connect</span>
+      <span class="fc-brand-version">v<?= fcE(fcAppVersion()) ?></span>
+    </a>
     <?php if (fcIsLoggedIn()): ?>
     <form method="post" action="logout.php" class="fc-logout-form">
       <?= fcCsrfField() ?>
