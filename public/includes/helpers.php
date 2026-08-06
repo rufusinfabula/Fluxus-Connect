@@ -16,6 +16,21 @@ function fcFlash(string $key): mixed
     return $value;
 }
 
+// Indirizzo assoluto dell'API riservata al Pi (Fase 3), calcolato dalla
+// richiesta corrente invece che scritto a mano da qualche parte: su hosting
+// economico Connect può vivere alla radice del dominio o in una
+// sottocartella (se il document root non è configurabile su public/, vedi
+// docs/NOTE-TECNICHE.md), quindi solo la richiesta in corso sa davvero dove
+// si trova. Va copiato così com'è nel file di segreti del Pi (Fase 6, vive
+// in fluxus-src) — meno probabilità di sbagliarlo a mano.
+function fcApiPiBaseUrl(): string
+{
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $scriptDir = rtrim(str_replace('\\', '/', dirname((string) ($_SERVER['SCRIPT_NAME'] ?? '/tenant.php'))), '/');
+    return "{$scheme}://{$host}{$scriptDir}/api/pi/";
+}
+
 function fcDescribeLogEvent(array $entry): string
 {
     $event = $entry['event'] ?? '';

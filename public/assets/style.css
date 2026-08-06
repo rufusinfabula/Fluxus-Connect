@@ -177,3 +177,6 @@ input[type="text"], input[type="password"], select {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.82rem;
 }
+
+.fc-live-card summary { cursor: pointer; font-weight: 600; }
+.fc-live-card[open] summary { margin-bottom: 0.5rem; }
