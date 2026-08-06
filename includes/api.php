@@ -87,3 +87,87 @@ function fcApiReadJsonBody(): array
     }
     return $data;
 }
+
+// --- Validatori di campo per elementi di un elenco (cataloghi del Pi) ----
+// Condivisi da recordings.php/markers.php/sources.php/schedules.php
+// (specchi pieni pubblicati dal Pi ogni 30s): stessa forma ripetuta
+// identica in ciascuno dei quattro, vale la pena di fattorizzarla qui
+// invece che nei singoli file. $context è il prefisso descrittivo
+// dell'elemento nel messaggio d'errore (es. "recordings[3]").
+
+// Stringa obbligatoria non vuota: per i campi usati come identificativo
+// (id, e i vari *_id) — trim applicato, coerente con l'id delle
+// registrazioni in status.php.
+function fcApiRequireEntryId(array $entry, string $field, string $context): string
+{
+    $value = $entry[$field] ?? null;
+    if (!is_string($value) || trim($value) === '') {
+        fcApiError(400, "{$context}.{$field} obbligatorio e non vuoto");
+    }
+    return trim($value);
+}
+
+// Stringa obbligatoria, salvata così com'è (niente trim): per campi non
+// identificativi (nomi, timestamp, espressioni opache) dove non spetta a
+// Connect deciderne il formato.
+function fcApiRequireEntryString(array $entry, string $field, string $context): string
+{
+    $value = $entry[$field] ?? null;
+    if (!is_string($value)) {
+        fcApiError(400, "{$context}.{$field} obbligatorio e deve essere una stringa");
+    }
+    return $value;
+}
+
+// Come fcApiRequireEntryString, ma la chiave deve essere presente anche
+// quando il valore è null.
+function fcApiRequireEntryNullableString(array $entry, string $field, string $context): ?string
+{
+    if (!array_key_exists($field, $entry)) {
+        fcApiError(400, "{$context}.{$field} obbligatorio (stringa o null)");
+    }
+    $value = $entry[$field];
+    if ($value !== null && !is_string($value)) {
+        fcApiError(400, "{$context}.{$field} deve essere una stringa o null");
+    }
+    return $value;
+}
+
+function fcApiRequireEntryInt(array $entry, string $field, string $context): int
+{
+    $value = $entry[$field] ?? null;
+    if (!is_int($value) || $value < 0) {
+        fcApiError(400, "{$context}.{$field} deve essere un intero non negativo");
+    }
+    return $value;
+}
+
+function fcApiRequireEntryNullableInt(array $entry, string $field, string $context): ?int
+{
+    if (!array_key_exists($field, $entry)) {
+        fcApiError(400, "{$context}.{$field} obbligatorio (intero o null)");
+    }
+    $value = $entry[$field];
+    if ($value !== null && (!is_int($value) || $value < 0)) {
+        fcApiError(400, "{$context}.{$field} deve essere un intero non negativo o null");
+    }
+    return $value;
+}
+
+function fcApiRequireEntryBool(array $entry, string $field, string $context): bool
+{
+    $value = $entry[$field] ?? null;
+    if (!is_bool($value)) {
+        fcApiError(400, "{$context}.{$field} deve essere un booleano");
+    }
+    return $value;
+}
+
+function fcApiRequireEntryEnum(array $entry, string $field, array $allowed, string $context): string
+{
+    $value = $entry[$field] ?? null;
+    if (!is_string($value) || !in_array($value, $allowed, true)) {
+        fcApiError(400, "{$context}.{$field} obbligatorio: ammessi solo " . implode(', ', $allowed));
+    }
+    return $value;
+}

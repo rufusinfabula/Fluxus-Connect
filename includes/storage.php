@@ -217,3 +217,45 @@ function fcQueueRemove(string $tenantHash, string $id): bool
     }
     return unlink($path);
 }
+
+// --- Cataloghi (storico registrazioni, marker/cue, sorgenti, orari) ------
+// Stesso principio di fcWriteStatus/fcReadStatus: specchio pieno, non una
+// coda — ogni pubblicazione del Pi (ogni 30s, vedi connect_catalog_sync.php
+// sul Pi) sostituisce per intero il catalogo noto a Connect per questo
+// tenant. I quattro cataloghi condividono la stessa forma su disco (un
+// oggetto con una sola chiave, l'elenco): un'unica coppia di funzioni
+// generiche basta, a differenza della coda (fcQueueEnqueue/fcQueueList/
+// fcQueueRemove), che ha semantiche diverse fra loro e non si presta alla
+// stessa generalizzazione.
+
+const FC_CATALOG_NAMES = ['recordings', 'markers', 'sources', 'schedules'];
+
+function fcCatalogPath(string $tenantHash, string $catalog): string
+{
+    if (!in_array($catalog, FC_CATALOG_NAMES, true)) {
+        throw new InvalidArgumentException("catalogo non valido: $catalog");
+    }
+    return fcTenantDir($tenantHash) . "/{$catalog}.json";
+}
+
+function fcWriteCatalog(string $tenantHash, string $catalog, array $items): void
+{
+    $json = json_encode([$catalog => $items], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+    fcAtomicWriteFile(fcCatalogPath($tenantHash, $catalog), $json);
+}
+
+// [] se il tenant non ha ancora pubblicato questo catalogo — non un
+// errore, stesso principio di fcReadStatus.
+function fcReadCatalog(string $tenantHash, string $catalog): array
+{
+    $path = fcCatalogPath($tenantHash, $catalog);
+    if (!is_file($path)) {
+        return [];
+    }
+    $raw = file_get_contents($path);
+    if ($raw === false || $raw === '') {
+        return [];
+    }
+    $data = json_decode($raw, true);
+    return is_array($data[$catalog] ?? null) ? $data[$catalog] : [];
+}

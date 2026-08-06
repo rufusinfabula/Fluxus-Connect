@@ -300,6 +300,93 @@ fcCheck('target_id valido fra le registrazioni attive: 200', $status === 200);
 $targetedEntry = current(array_filter(fcQueueList($targetTenantHash), fn($c) => $c['id'] === $body['id']));
 fcCheck('il bersaglio scelto dalla console viene salvato', $targetedEntry !== false && $targetedEntry['target_id'] === 'reg-b');
 
+// --- follow/recordings.php ---------------------------------------------------
+
+echo "\nfollow/recordings.php:\n";
+fcWriteCatalog($tenantHash, 'recordings', [
+    ['id' => 'rec-1', 'source_id' => 'src-1', 'source_name' => 'Ingresso 1', 'media_type' => 'video', 'status' => 'completed', 'start_time' => '2026-08-04T10:00:00Z', 'end_time' => '2026-08-04T10:42:00Z', 'duration_seconds' => 2520, 'marker_count' => 2, 'clip_count' => 1, 'pid' => 12345, 'internal_note' => 'non deve mai uscire'],
+    ['id' => 'rec-2', 'source_id' => 'src-2', 'source_name' => 'Ingresso 2', 'media_type' => 'audio', 'status' => 'recording', 'start_time' => '2026-08-04T11:00:00Z', 'end_time' => '', 'duration_seconds' => null, 'marker_count' => 0, 'clip_count' => 0],
+]);
+
+[$status] = fcApiTestRequest('GET', "{$base}/follow/recordings.php");
+fcCheck('senza token: 401', $status === 401);
+
+[$status, $body] = fcApiTestRequest('GET', "{$base}/follow/recordings.php", [$followAuth]);
+fcCheck('elenco completo: 200 con due elementi', $status === 200 && count($body['recordings']) === 2);
+fcCheck("campo non whitelisted 'pid' non esce mai in risposta", !array_key_exists('pid', $body['recordings'][0]));
+fcCheck("campo non whitelisted 'internal_note' non esce mai in risposta", !array_key_exists('internal_note', $body['recordings'][0]));
+
+[$status, $body] = fcApiTestRequest('GET', "{$base}/follow/recordings.php?media_type=audio", [$followAuth]);
+fcCheck("filtro media_type: 200 con un solo elemento ('rec-2')", $status === 200 && count($body['recordings']) === 1 && $body['recordings'][0]['id'] === 'rec-2');
+
+[$status, $body] = fcApiTestRequest('GET', "{$base}/follow/recordings.php?status=completed&source_id=src-1", [$followAuth]);
+fcCheck('filtri combinati (status+source_id): 200 con un solo elemento', $status === 200 && count($body['recordings']) === 1 && $body['recordings'][0]['id'] === 'rec-1');
+
+[$status] = fcApiTestRequest('GET', "{$base}/follow/recordings.php?media_type=laser", [$followAuth]);
+fcCheck('media_type fuori enum: 400', $status === 400);
+
+[$status, $body] = fcApiTestRequest('GET', "{$base}/follow/recordings.php?id=rec-1", [$followAuth]);
+fcCheck('dettaglio con id valido: 200 con i campi whitelisted', $status === 200 && $body['id'] === 'rec-1' && $body['duration_seconds'] === 2520);
+fcCheck("il dettaglio non è avvolto in {recordings: [...]}", !array_key_exists('recordings', $body));
+
+[$status, $body] = fcApiTestRequest('GET', "{$base}/follow/recordings.php?id=rec-non-esiste", [$followAuth]);
+fcCheck('dettaglio con id inesistente: 404', $status === 404);
+
+// --- follow/recordings_markers.php --------------------------------------------
+
+echo "\nfollow/recordings_markers.php:\n";
+fcWriteCatalog($tenantHash, 'markers', [
+    ['id' => 'mrk-1', 'recording_id' => 'rec-1', 'elapsed_seconds' => 5, 'elapsed_hms' => '00:00:05', 'absolute_time' => '2026-08-04T10:00:05Z', 'label' => 'Inizio', 'type' => 'marker', 'clip_status' => 'ready', 'origin' => 'console', 'origin_label' => 'Regia', 'created_at' => '2026-08-04T10:00:05.000000Z'],
+    ['id' => 'mrk-2', 'recording_id' => 'rec-1', 'elapsed_seconds' => 15, 'elapsed_hms' => '00:00:15', 'absolute_time' => '2026-08-04T10:00:15Z', 'label' => null, 'type' => 'cue', 'clip_status' => null, 'origin' => null, 'origin_label' => null, 'created_at' => '2026-08-04T10:00:15.000000Z'],
+    ['id' => 'mrk-3', 'recording_id' => 'rec-2', 'elapsed_seconds' => 1, 'elapsed_hms' => '00:00:01', 'absolute_time' => '2026-08-04T11:00:01Z', 'label' => null, 'type' => 'marker', 'clip_status' => null, 'origin' => null, 'origin_label' => null, 'created_at' => '2026-08-04T11:00:01.000000Z'],
+]);
+
+[$status] = fcApiTestRequest('GET', "{$base}/follow/recordings_markers.php?id=rec-1");
+fcCheck('senza token: 401', $status === 401);
+
+[$status] = fcApiTestRequest('GET', "{$base}/follow/recordings_markers.php", [$followAuth]);
+fcCheck("senza 'id': 400", $status === 400);
+
+[$status, $body] = fcApiTestRequest('GET', "{$base}/follow/recordings_markers.php?id=rec-1", [$followAuth]);
+fcCheck("marker della registrazione 'rec-1': 200 con due elementi", $status === 200 && count($body['markers']) === 2);
+
+[$status, $body] = fcApiTestRequest('GET', "{$base}/follow/recordings_markers.php?id=rec-1&type=cue", [$followAuth]);
+fcCheck("filtro type=cue: 200 con un solo elemento ('mrk-2')", $status === 200 && count($body['markers']) === 1 && $body['markers'][0]['id'] === 'mrk-2');
+
+[$status, $body] = fcApiTestRequest('GET', "{$base}/follow/recordings_markers.php?id=rec-non-esiste", [$followAuth]);
+fcCheck("id di registrazione sconosciuto: 200 con elenco vuoto (mai 404)", $status === 200 && $body['markers'] === []);
+
+[$status] = fcApiTestRequest('GET', "{$base}/follow/recordings_markers.php?id=rec-1&type=nota", [$followAuth]);
+fcCheck('type fuori enum: 400', $status === 400);
+
+// --- follow/sources.php --------------------------------------------------------
+
+echo "\nfollow/sources.php:\n";
+fcWriteCatalog($tenantHash, 'sources', [
+    ['id' => 'src-1', 'name' => 'Ingresso 1', 'media_type' => 'video', 'active' => true, 'device_path' => '/dev/video0'],
+    ['id' => 'src-2', 'name' => 'Ingresso 2', 'media_type' => 'audio', 'active' => false],
+]);
+
+[$status] = fcApiTestRequest('GET', "{$base}/follow/sources.php");
+fcCheck('senza token: 401', $status === 401);
+
+[$status, $body] = fcApiTestRequest('GET', "{$base}/follow/sources.php", [$followAuth]);
+fcCheck('elenco sorgenti: 200 con due elementi', $status === 200 && count($body['sources']) === 2);
+fcCheck("campo non whitelisted 'device_path' non esce mai in risposta", !array_key_exists('device_path', $body['sources'][0]));
+
+// --- follow/schedules.php -------------------------------------------------------
+
+echo "\nfollow/schedules.php:\n";
+fcWriteCatalog($tenantHash, 'schedules', [
+    ['id' => 'sch-1', 'source_id' => 'src-1', 'source_name' => 'Ingresso 1', 'label' => 'Prova serale', 'on_calendar' => 'Mon..Fri 20:00', 'slot_duration' => 3600, 'active' => true],
+]);
+
+[$status] = fcApiTestRequest('GET', "{$base}/follow/schedules.php");
+fcCheck('senza token: 401', $status === 401);
+
+[$status, $body] = fcApiTestRequest('GET', "{$base}/follow/schedules.php", [$followAuth]);
+fcCheck('elenco orari: 200 con un elemento', $status === 200 && count($body['schedules']) === 1 && $body['schedules'][0]['on_calendar'] === 'Mon..Fri 20:00');
+
 // --- last_used_at ------------------------------------------------------------
 
 echo "\nlast_used_at:\n";
@@ -320,6 +407,9 @@ fcCheck("una sotto-chiave vede solo lo stato del proprio tenant", $status === 20
 fcCheck("un comando depositato con la sotto-chiave dell'altro Pi finisce nella sua coda, non in quella del primo", $status === 200);
 fcCheck('la coda del primo tenant non è stata toccata', count(fcQueueList($tenantHash)) === 2);
 fcCheck("la coda dell'altro tenant riceve il comando", count(fcQueueList($otherTenant['tenant_hash'])) === 1);
+
+[$status, $body] = fcApiTestRequest('GET', "{$base}/follow/recordings.php", ['Authorization: Bearer ' . $otherKey['token']]);
+fcCheck("una sotto-chiave non vede i cataloghi di un altro tenant", $status === 200 && $body['recordings'] === []);
 
 // --- Chiusura -----------------------------------------------------------------
 

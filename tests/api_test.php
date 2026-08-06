@@ -274,6 +274,94 @@ fcRevokeSubkey($tenantHash, $revokedSubkey['subkey_hash']);
 fcCheck('elenca solo le sotto-chiavi attive: 200', $status === 200 && $body['subkeys'] === ['Regia video']);
 fcCheck('la sotto-chiave revocata non compare', !in_array('Console dismessa', $body['subkeys'], true));
 
+// --- recordings.php ---------------------------------------------------------
+
+echo "\nrecordings.php — autenticazione e validazione:\n";
+[$status] = fcApiTestRequest('POST', "{$base}/recordings.php", ['Content-Type: application/json'], json_encode(['recordings' => []]));
+fcCheck('senza token: 401', $status === 401);
+
+[$status] = fcApiTestRequest('GET', "{$base}/recordings.php", [$authHeader]);
+fcCheck('metodo sbagliato (GET invece di POST): 405', $status === 405);
+
+[$status] = fcApiTestRequest('POST', "{$base}/recordings.php", $jsonHeaders, json_encode(['altro' => []]));
+fcCheck("senza 'recordings': 400", $status === 400);
+
+[$status] = fcApiTestRequest('POST', "{$base}/recordings.php", $jsonHeaders, json_encode(['recordings' => [['source_id' => 'src-1']]]));
+fcCheck("elemento senza 'id': 400", $status === 400);
+
+[$status] = fcApiTestRequest('POST', "{$base}/recordings.php", $jsonHeaders, json_encode(['recordings' => [[
+    'id' => 'rec-1', 'source_id' => 'src-1', 'source_name' => 'Ingresso 1',
+    'media_type' => 'laser', 'status' => 'completed', 'start_time' => '2026-08-04T10:00:00Z',
+    'end_time' => '2026-08-04T10:42:00Z', 'duration_seconds' => 2520, 'marker_count' => 0, 'clip_count' => 0,
+]]]));
+fcCheck("media_type fuori enum: 400", $status === 400);
+
+[$status] = fcApiTestRequest('POST', "{$base}/recordings.php", $jsonHeaders, json_encode(['recordings' => [
+    ['id' => 'rec-1', 'source_id' => 's', 'source_name' => 's', 'media_type' => 'video', 'status' => 'completed', 'start_time' => 't', 'end_time' => 't', 'duration_seconds' => null, 'marker_count' => 0, 'clip_count' => 0],
+    ['id' => 'rec-1', 'source_id' => 's', 'source_name' => 's', 'media_type' => 'video', 'status' => 'completed', 'start_time' => 't', 'end_time' => 't', 'duration_seconds' => null, 'marker_count' => 0, 'clip_count' => 0],
+]]));
+fcCheck('id duplicato: 400', $status === 400);
+
+echo "\nrecordings.php — scrittura (specchio pieno):\n";
+$recordingsPayload = ['recordings' => [
+    ['id' => 'rec-1', 'source_id' => 'src-1', 'source_name' => 'Ingresso 1', 'media_type' => 'video', 'status' => 'recording', 'start_time' => '2026-08-04T10:00:00Z', 'end_time' => '', 'duration_seconds' => null, 'marker_count' => 2, 'clip_count' => 0],
+    ['id' => 'rec-2', 'source_id' => 'src-2', 'source_name' => 'Ingresso 2', 'media_type' => 'audio', 'status' => 'completed', 'start_time' => '2026-08-04T09:00:00Z', 'end_time' => '2026-08-04T09:30:00Z', 'duration_seconds' => 1800, 'marker_count' => 0, 'clip_count' => 1],
+]];
+[$status, $body] = fcApiTestRequest('POST', "{$base}/recordings.php", $jsonHeaders, json_encode($recordingsPayload));
+fcCheck('scrittura riuscita: 200, ok:true, count:2', $status === 200 && ($body['ok'] ?? null) === true && ($body['count'] ?? null) === 2);
+fcCheck('rilettura con due registrazioni', count(fcReadCatalog($tenantHash, 'recordings')) === 2);
+
+[$status, $body] = fcApiTestRequest('POST', "{$base}/recordings.php", $jsonHeaders, json_encode(['recordings' => [$recordingsPayload['recordings'][0]]]));
+fcCheck('seconda pubblicazione: 200, count:1', $status === 200 && ($body['count'] ?? null) === 1);
+fcCheck('la seconda pubblicazione sostituisce per intero la prima (non un merge)', count(fcReadCatalog($tenantHash, 'recordings')) === 1);
+
+// --- markers.php --------------------------------------------------------------
+
+echo "\nmarkers.php — validazione e scrittura:\n";
+[$status] = fcApiTestRequest('POST', "{$base}/markers.php", ['Content-Type: application/json'], json_encode(['markers' => []]));
+fcCheck('senza token: 401', $status === 401);
+
+[$status] = fcApiTestRequest('POST', "{$base}/markers.php", $jsonHeaders, json_encode(['markers' => [['id' => 'mrk-1', 'recording_id' => 'rec-1', 'type' => 'nota']]]));
+fcCheck("type fuori enum: 400", $status === 400);
+
+$markersPayload = ['markers' => [
+    ['id' => 'mrk-1', 'recording_id' => 'rec-1', 'elapsed_seconds' => 5, 'elapsed_hms' => '00:00:05', 'absolute_time' => '2026-08-04T10:00:05Z', 'label' => 'Inizio', 'type' => 'marker', 'clip_status' => 'ready', 'origin' => 'console', 'origin_label' => 'Regia', 'created_at' => '2026-08-04T10:00:05.000000Z'],
+    // recording_id "orfano": nessuna registrazione con questo id è mai stata pubblicata, ma resta accettato.
+    ['id' => 'mrk-2', 'recording_id' => 'rec-inesistente', 'elapsed_seconds' => 10, 'elapsed_hms' => '00:00:10', 'absolute_time' => '2026-08-04T10:00:10Z', 'label' => null, 'type' => 'cue', 'clip_status' => null, 'origin' => null, 'origin_label' => null, 'created_at' => '2026-08-04T10:00:10.000000Z'],
+]];
+[$status, $body] = fcApiTestRequest('POST', "{$base}/markers.php", $jsonHeaders, json_encode($markersPayload));
+fcCheck('scrittura riuscita: 200, count:2', $status === 200 && ($body['count'] ?? null) === 2);
+$storedMarkers = fcReadCatalog($tenantHash, 'markers');
+fcCheck('marker con recording_id orfano accettato comunque', count($storedMarkers) === 2);
+fcCheck('label null preservata', $storedMarkers[1]['label'] === null);
+
+// --- sources.php ----------------------------------------------------------------
+
+echo "\nsources.php — validazione e scrittura:\n";
+[$status] = fcApiTestRequest('POST', "{$base}/sources.php", $jsonHeaders, json_encode(['sources' => [['id' => 'src-1', 'name' => 'Ingresso 1', 'media_type' => 'video', 'active' => 'sì']]]));
+fcCheck("active non booleano: 400", $status === 400);
+
+$sourcesPayload = ['sources' => [
+    ['id' => 'src-1', 'name' => 'Ingresso 1', 'media_type' => 'video', 'active' => true],
+    ['id' => 'src-2', 'name' => 'Ingresso 2', 'media_type' => 'audio', 'active' => false],
+]];
+[$status, $body] = fcApiTestRequest('POST', "{$base}/sources.php", $jsonHeaders, json_encode($sourcesPayload));
+fcCheck('scrittura riuscita: 200, count:2', $status === 200 && ($body['count'] ?? null) === 2);
+fcCheck('rilettura con due sorgenti', count(fcReadCatalog($tenantHash, 'sources')) === 2);
+
+// --- schedules.php --------------------------------------------------------------
+
+echo "\nschedules.php — validazione e scrittura:\n";
+[$status] = fcApiTestRequest('POST', "{$base}/schedules.php", $jsonHeaders, json_encode(['schedules' => [['id' => 'sch-1', 'source_id' => 'src-1', 'source_name' => 'Ingresso 1', 'label' => 'Prova', 'on_calendar' => 'Mon 20:00', 'slot_duration' => -1, 'active' => true]]]));
+fcCheck('slot_duration negativo: 400', $status === 400);
+
+$schedulesPayload = ['schedules' => [
+    ['id' => 'sch-1', 'source_id' => 'src-1', 'source_name' => 'Ingresso 1', 'label' => 'Prova serale', 'on_calendar' => 'Mon..Fri 20:00', 'slot_duration' => 3600, 'active' => true],
+]];
+[$status, $body] = fcApiTestRequest('POST', "{$base}/schedules.php", $jsonHeaders, json_encode($schedulesPayload));
+fcCheck('scrittura riuscita: 200, count:1', $status === 200 && ($body['count'] ?? null) === 1);
+fcCheck('rilettura con un orario', count(fcReadCatalog($tenantHash, 'schedules')) === 1);
+
 // --- Isolamento fra tenant --------------------------------------------------
 
 echo "\nIsolamento fra tenant:\n";
@@ -282,6 +370,8 @@ fcQueueEnqueue($tenantHash, ['azione' => 'marker', 'etichetta' => 'solo per il p
 
 [$status, $body] = fcApiTestRequest('GET', "{$base}/queue.php", ['Authorization: Bearer ' . $otherTenant['token']]);
 fcCheck("un Pi non vede la coda di un altro Pi", $status === 200 && $body['commands'] === []);
+
+fcCheck("i cataloghi di un Pi non sono visibili all'altro", fcReadCatalog($otherTenant['tenant_hash'], 'recordings') === []);
 
 // --- Chiusura ---------------------------------------------------------------
 

@@ -7,6 +7,20 @@ a fasi con cui il progetto è stato costruito (numerate o con nome, es.
 "Fase X") — restano qui come cronologia, anche se quello schema non è più
 in uso.
 
+## 1.1.0
+
+Il Pi pubblica ora anche uno specchio pieno (non incrementale, sostituito
+per intero a ogni giro) di quattro cataloghi ogni 30s: storico
+registrazioni, marker/cue, sorgenti, orari programmati. Nuovi endpoint
+riservati al Pi (`POST /api/pi/recordings.php`, `markers.php`,
+`sources.php`, `schedules.php`) e nuovi endpoint pubblici, stesso scope
+`follow` già in uso per `follow/status.php` (`GET
+/api/v1/follow/recordings.php`, con filtri `media_type`/`source_id`/
+`status` e dettaglio tramite `?id=`; `GET
+/api/v1/follow/recordings_markers.php?id=...`; `GET
+/api/v1/follow/sources.php`; `GET /api/v1/follow/schedules.php`).
+`public/docs/openapi.yaml` aggiornato di conseguenza (`0.6.0`).
+
 ## 1.0.0
 
 Primo rilascio definitivo: Fluxus Connect è completo e pronto per l'uso in

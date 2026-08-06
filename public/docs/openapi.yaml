@@ -1,18 +1,19 @@
 openapi: 3.0.3
 info:
   title: Fluxus Connect — API pubblica
-  version: "0.5.0"
+  version: "0.6.0"
   description: |
-    API pubblica di Fluxus Connect (Fase 4 della roadmap), per sistemi
-    esterni — console di regia, software di scaletta — che vogliono
-    seguire o inviare istruzioni a una registrazione Fluxus senza mai
-    raggiungere direttamente il Pi, che resta in rete privata.
+    API pubblica di Fluxus Connect, per sistemi esterni — console di
+    regia, software di scaletta — che vogliono seguire o inviare
+    istruzioni a una registrazione Fluxus senza mai raggiungere
+    direttamente il Pi, che resta in rete privata.
 
     Documenta solo ciò che esiste ed è collaudato oggi: lettura dello
-    stato (`follow`) e deposito di un comando marker/cue (`controllo`).
+    stato (`follow`), lettura dei cataloghi pubblicati dal Pi (storico
+    registrazioni, marker/cue, sorgenti, orari programmati — stesso
+    scope `follow`) e deposito di un comando marker/cue (`controllo`).
     Avvio/stop registrazione da remoto **non** sono previsti in questa
-    versione dell'API — restano PENDING/FUTURO, vedi
-    `docs/ROADMAP.md` e `docs/NOTE-TECNICHE.md` nel repository sorgente.
+    versione dell'API — restano PENDING/FUTURO.
 
     Fluxus può registrare da più sorgenti contemporaneamente: `registrations`
     in `FollowStatus` elenca tutte le registrazioni attive, e `target_id`
@@ -293,6 +294,259 @@ paths:
                 $ref: "#/components/schemas/Error"
               example:
                 error: "metodo non consentito, atteso POST"
+  /follow/recordings.php:
+    get:
+      operationId: getFollowRecordings
+      tags: [follow]
+      summary: Elenco delle registrazioni, o dettaglio di una singola con ?id=
+      description: |
+        Specchio di sola lettura dello storico registrazioni pubblicato
+        dal Pi (via la sua API riservata, non esposta qui). Nessun
+        instradamento dinamico nel progetto: il dettaglio di una singola
+        registrazione passa dal parametro di query `id`, non da un
+        segmento di percorso — `404` se non corrisponde a nessuna
+        registrazione nota a questo tenant.
+
+        Senza `id`, restituisce l'elenco completo, filtrabile con
+        `media_type`, `source_id`, `status` (combinabili fra loro).
+
+        Whitelist in lettura applicata anche qui, in aggiunta a quella
+        già imposta in scrittura dall'API riservata al Pi (difesa in
+        profondità).
+      security:
+        - subkeyAuth: []
+      parameters:
+        - name: id
+          in: query
+          required: false
+          description: >-
+            Se presente, restituisce il dettaglio di questa sola
+            registrazione invece dell'elenco; ignora gli altri filtri.
+          schema:
+            type: string
+        - name: media_type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [audio, video, clock]
+        - name: source_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [recording, completed, failed]
+      responses:
+        "200":
+          description: >-
+            Elenco (eventualmente filtrato) senza `id`, dettaglio della
+            singola registrazione con `id`.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/RecordingsList"
+                  - $ref: "#/components/schemas/Recording"
+              examples:
+                elenco:
+                  summary: Elenco senza filtri
+                  value:
+                    recordings:
+                      - id: "rec-a1b2c3"
+                        source_id: "src-1"
+                        source_name: "Ingresso 1"
+                        media_type: "video"
+                        status: "completed"
+                        start_time: "2026-08-04T10:00:00Z"
+                        end_time: "2026-08-04T10:42:00Z"
+                        duration_seconds: 2520
+                        marker_count: 3
+                        clip_count: 1
+                dettaglio:
+                  summary: Dettaglio con ?id=rec-a1b2c3
+                  value:
+                    id: "rec-a1b2c3"
+                    source_id: "src-1"
+                    source_name: "Ingresso 1"
+                    media_type: "video"
+                    status: "completed"
+                    start_time: "2026-08-04T10:00:00Z"
+                    end_time: "2026-08-04T10:42:00Z"
+                    duration_seconds: 2520
+                    marker_count: 3
+                    clip_count: 1
+        "400":
+          description: Parametro di query non valido (`id` vuoto, o `media_type`/`status` fuori enum).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Sotto-chiave mancante, malformata, inesistente o revocata.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "`id` richiesto ma non corrisponde a nessuna registrazione nota."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "nessuna registrazione nota con id: rec-a1b2c3"
+        "405":
+          description: Metodo diverso da GET.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /follow/recordings_markers.php:
+    get:
+      operationId: getFollowRecordingMarkers
+      tags: [follow]
+      summary: Marker/cue di una registrazione
+      description: |
+        Specchio di sola lettura di quanto pubblicato dal Pi via la sua
+        API riservata per marker/cue. Parametro di query `id`
+        obbligatorio (id della registrazione, non un segmento di
+        percorso — stesso motivo di `/follow/recordings.php`). Nessuna
+        verifica che `id` corrisponda a una registrazione nota: un
+        marker con un `recording_id` "orfano" è innocuo, quindi si
+        applica solo il filtro, mai un `404` sull'id della registrazione.
+        Filtro opzionale aggiuntivo: `type`.
+      security:
+        - subkeyAuth: []
+      parameters:
+        - name: id
+          in: query
+          required: true
+          description: Id della registrazione di cui elencare i marker/cue.
+          schema:
+            type: string
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [marker, cue]
+      responses:
+        "200":
+          description: Elenco (eventualmente vuoto) dei marker/cue della registrazione.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarkersList"
+              example:
+                markers:
+                  - id: "mrk-1"
+                    recording_id: "rec-a1b2c3"
+                    elapsed_seconds: 90
+                    elapsed_hms: "00:01:30"
+                    absolute_time: "2026-08-04T10:01:30Z"
+                    label: "Ingresso ospite"
+                    type: "marker"
+                    clip_status: "ready"
+                    origin: "console"
+                    origin_label: "Software di scaletta"
+                    created_at: "2026-08-04T10:01:30.500000Z"
+        "400":
+          description: "`id` mancante/vuoto, o `type` fuori enum."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Sotto-chiave mancante, malformata, inesistente o revocata.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "405":
+          description: Metodo diverso da GET.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /follow/sources.php:
+    get:
+      operationId: getFollowSources
+      tags: [follow]
+      summary: Elenco sorgenti
+      description: >-
+        Specchio di sola lettura del catalogo sorgenti pubblicato dal Pi.
+        Whitelist in lettura applicata anche qui, difesa in profondità.
+      security:
+        - subkeyAuth: []
+      responses:
+        "200":
+          description: Elenco sorgenti.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourcesList"
+              example:
+                sources:
+                  - id: "src-1"
+                    name: "Ingresso 1"
+                    media_type: "video"
+                    active: true
+        "401":
+          description: Sotto-chiave mancante, malformata, inesistente o revocata.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "405":
+          description: Metodo diverso da GET.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /follow/schedules.php:
+    get:
+      operationId: getFollowSchedules
+      tags: [follow]
+      summary: Elenco orari programmati
+      description: >-
+        Specchio di sola lettura degli orari programmati pubblicato dal
+        Pi. Whitelist in lettura applicata anche qui, difesa in
+        profondità.
+      security:
+        - subkeyAuth: []
+      responses:
+        "200":
+          description: Elenco orari programmati.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SchedulesList"
+              example:
+                schedules:
+                  - id: "sch-1"
+                    source_id: "src-1"
+                    source_name: "Ingresso 1"
+                    label: "Prova serale"
+                    on_calendar: "Mon..Fri 20:00"
+                    slot_duration: 3600
+                    active: true
+        "401":
+          description: Sotto-chiave mancante, malformata, inesistente o revocata.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "405":
+          description: Metodo diverso da GET.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 components:
   securitySchemes:
     subkeyAuth:
@@ -460,6 +714,202 @@ components:
           type: string
           description: Identificativo del comando in coda, assegnato da Connect.
           example: "20260804T210000.000000Z-a1b2c3d4"
+    Recording:
+      type: object
+      description: Una registrazione dello storico, così come pubblicata dal Pi.
+      required:
+        - id
+        - source_id
+        - source_name
+        - media_type
+        - status
+        - start_time
+        - end_time
+        - duration_seconds
+        - marker_count
+        - clip_count
+      properties:
+        id:
+          type: string
+          example: "rec-a1b2c3"
+        source_id:
+          type: string
+          example: "src-1"
+        source_name:
+          type: string
+          example: "Ingresso 1"
+        media_type:
+          type: string
+          enum: [audio, video, clock]
+          example: "video"
+        status:
+          type: string
+          enum: [recording, completed, failed]
+          example: "completed"
+        start_time:
+          type: string
+          example: "2026-08-04T10:00:00Z"
+        end_time:
+          type: string
+          example: "2026-08-04T10:42:00Z"
+        duration_seconds:
+          type: integer
+          nullable: true
+          minimum: 0
+          example: 2520
+        marker_count:
+          type: integer
+          minimum: 0
+          example: 3
+        clip_count:
+          type: integer
+          minimum: 0
+          example: 1
+    RecordingsList:
+      type: object
+      required: [recordings]
+      properties:
+        recordings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Recording"
+    Marker:
+      type: object
+      description: Un marker/cue, così come pubblicato dal Pi.
+      required:
+        - id
+        - recording_id
+        - elapsed_seconds
+        - elapsed_hms
+        - absolute_time
+        - label
+        - type
+        - clip_status
+        - origin
+        - origin_label
+        - created_at
+      properties:
+        id:
+          type: string
+          example: "mrk-1"
+        recording_id:
+          type: string
+          description: >-
+            Id della registrazione a cui appartiene. Può non corrispondere
+            a nessuna registrazione nota a questo tenant (innocuo).
+          example: "rec-a1b2c3"
+        elapsed_seconds:
+          type: integer
+          minimum: 0
+          example: 90
+        elapsed_hms:
+          type: string
+          example: "00:01:30"
+        absolute_time:
+          type: string
+          description: ISO 8601 o formato del Pi, trattato come stringa opaca.
+          example: "2026-08-04T10:01:30Z"
+        label:
+          type: string
+          nullable: true
+          example: "Ingresso ospite"
+        type:
+          type: string
+          enum: [marker, cue]
+          example: "marker"
+        clip_status:
+          type: string
+          nullable: true
+          example: "ready"
+        origin:
+          type: string
+          nullable: true
+          example: "console"
+        origin_label:
+          type: string
+          nullable: true
+          example: "Software di scaletta"
+        created_at:
+          type: string
+          example: "2026-08-04T10:01:30.500000Z"
+    MarkersList:
+      type: object
+      required: [markers]
+      properties:
+        markers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Marker"
+    Source:
+      type: object
+      description: Una sorgente del catalogo, così come pubblicata dal Pi.
+      required: [id, name, media_type, active]
+      properties:
+        id:
+          type: string
+          example: "src-1"
+        name:
+          type: string
+          example: "Ingresso 1"
+        media_type:
+          type: string
+          enum: [audio, video, clock]
+          example: "video"
+        active:
+          type: boolean
+          example: true
+    SourcesList:
+      type: object
+      required: [sources]
+      properties:
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/Source"
+    Schedule:
+      type: object
+      description: Un orario programmato, così come pubblicato dal Pi.
+      required:
+        - id
+        - source_id
+        - source_name
+        - label
+        - on_calendar
+        - slot_duration
+        - active
+      properties:
+        id:
+          type: string
+          example: "sch-1"
+        source_id:
+          type: string
+          example: "src-1"
+        source_name:
+          type: string
+          example: "Ingresso 1"
+        label:
+          type: string
+          example: "Prova serale"
+        on_calendar:
+          type: string
+          description: Espressione systemd OnCalendar, così come pubblicata dal Pi.
+          example: "Mon..Fri 20:00"
+        slot_duration:
+          type: integer
+          minimum: 0
+          description: Durata dello slot, in secondi.
+          example: 3600
+        active:
+          type: boolean
+          example: true
+    SchedulesList:
+      type: object
+      required: [schedules]
+      properties:
+        schedules:
+          type: array
+          items:
+            $ref: "#/components/schemas/Schedule"
     Error:
       type: object
       required: [error]
