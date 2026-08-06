@@ -162,6 +162,22 @@ da mantenere qui (stesso principio per cui Connect non assorbe i propri
 consumer — vedi "Decisioni già prese"). La sotto-chiave creata per la
 prova è stata revocata a validazione conclusa.
 
+## Fase Y — `whoami.php`, mancante dal contratto con fluxus-src ✅ FATTO
+
+Non numerata, come la Fase X: emersa durante il primo collegamento reale
+in produzione (Fase 8), non dalla roadmap lineare. Il pannello di Fluxus
+(Impostazioni → Fluxus Connect, `fmConnectTest()` in `includes/helpers.php`
+di fluxus-src) ha un pulsante "Testa connessione" che chiama
+`GET /api/pi/whoami.php` — endpoint mai costruito qui: Fase 3 aveva
+previsto solo `status.php`, `queue.php`, `ack.php`. Il contratto era già
+scritto lato Fluxus (commento sopra `fmConnectTest()`), quindi si è
+implementato esattamente quello: 200 JSON `{"subkeys": [...]}` coi nomi
+delle sotto-chiavi attive del tenant (array vuoto se nessuna), stessa
+autenticazione col token di primo livello degli altri endpoint riservati,
+401 per token mancante/malformato/sconosciuto. Solo le sotto-chiavi non
+revocate: una console che ha perso l'accesso non deve risultare ancora
+collegata. Vedi `public/api/pi/whoami.php`, `tests/api_test.php`.
+
 ---
 
 ## Più avanti

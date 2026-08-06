@@ -254,6 +254,26 @@ $logEntries = fcLogRead($tenantHash);
 fcCheck("l'esecuzione confermata compare nel log di attività", $logEntries[0]['event'] === 'command_acknowledged'
     && $logEntries[0]['context']['id'] === $queueId);
 
+// --- whoami.php -----------------------------------------------------------------
+
+echo "\nwhoami.php:\n";
+[$status] = fcApiTestRequest('GET', "{$base}/whoami.php", []);
+fcCheck('senza token: 401', $status === 401);
+
+[$status] = fcApiTestRequest('POST', "{$base}/whoami.php", [$authHeader]);
+fcCheck('metodo sbagliato (POST invece di GET): 405', $status === 405);
+
+[$status, $body] = fcApiTestRequest('GET', "{$base}/whoami.php", [$authHeader]);
+fcCheck('nessuna sotto-chiave: 200 con lista vuota', $status === 200 && $body['subkeys'] === []);
+
+$whoamiSubkey = fcCreateSubkey($tenantHash, 'Regia video', 'follow');
+$revokedSubkey = fcCreateSubkey($tenantHash, 'Console dismessa', 'follow');
+fcRevokeSubkey($tenantHash, $revokedSubkey['subkey_hash']);
+
+[$status, $body] = fcApiTestRequest('GET', "{$base}/whoami.php", [$authHeader]);
+fcCheck('elenca solo le sotto-chiavi attive: 200', $status === 200 && $body['subkeys'] === ['Regia video']);
+fcCheck('la sotto-chiave revocata non compare', !in_array('Console dismessa', $body['subkeys'], true));
+
 // --- Isolamento fra tenant --------------------------------------------------
 
 echo "\nIsolamento fra tenant:\n";

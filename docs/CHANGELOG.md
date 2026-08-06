@@ -5,6 +5,14 @@ Sotto l'1.0 il numero di versione coincide con la fase della roadmap (vedi
 questa — che restano nella versione della fase che estendono invece di
 aprirne una nuova, quando il cambio è additivo.
 
+## Fase Y — `whoami.php`
+
+Nuovo endpoint `GET /api/pi/whoami.php` (autenticato col token di primo
+livello, come `status.php`/`queue.php`/`ack.php`): risponde
+`{"subkeys": [...]}` con le sotto-chiavi attive del tenant, per il
+pulsante "Testa connessione" del pannello di Fluxus — endpoint già atteso
+da quel lato ma mai costruito qui. Vedi [ROADMAP.md](ROADMAP.md).
+
 ## Fase 8 — Prima integrazione reale (parte Connect)
 
 Non un cambio di codice, quindi nessuna nuova versione: prima validazione
