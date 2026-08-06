@@ -5,6 +5,24 @@ Sotto l'1.0 il numero di versione coincide con la fase della roadmap (vedi
 questa — che restano nella versione della fase che estendono invece di
 aprirne una nuova, quando il cambio è additivo.
 
+## 0.5.2
+
+Correzione di presentazione nel pannello, emersa discutendo lo strumento
+di prova delle API (Fase Z): `public/tenant.php` mostrava il segreto di
+una sotto-chiave appena creata nello stesso banner, in cima alla pagina,
+usato per il token dell'istanza quando lo si rigenera — facile confondere
+i due. Il segreto di una sotto-chiave ora appare dentro la sua riga
+nell'elenco, col nome della console; il banner in cima resta riservato al
+solo token dell'istanza. Nessun cambio al modello dati (`includes/subkeys.php`
+invariato) né al contratto pubblico. Vedi [ROADMAP.md](ROADMAP.md), Fase Z.
+
+## 0.5.1
+
+Correzioni minori nel codice di Connect, emerse durante il collaudo
+end-to-end (Fase 7): impatto trascurabile, nessun cambio al contratto
+pubblico (`/api/v1/...` invariato, `public/docs/openapi.yaml` resta alla
+`0.5.0`). Vedi [ROADMAP.md](ROADMAP.md), Fase 7.
+
 ## Fase W — Avvio di Fluxus Remote 1.5 (decisione)
 
 Non un cambio di codice, quindi nessuna nuova versione: decisione di

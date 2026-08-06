@@ -27,6 +27,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $result = fcCreateSubkey($tenantHash, (string) ($_POST['name'] ?? ''), (string) ($_POST['scope'] ?? ''));
             $_SESSION['fc_flash_token'] = $result['token'];
             $_SESSION['fc_flash_token_tenant'] = $tenantHash;
+            $_SESSION['fc_flash_kind'] = 'subkey';
+            $_SESSION['fc_flash_subkey_hash'] = $result['subkey_hash'];
             header('Location: tenant.php?id=' . $tenantHash);
             exit;
         } catch (InvalidArgumentException $e) {
@@ -43,6 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $result = fcRegenerateTenantToken($tenantHash);
         $_SESSION['fc_flash_token'] = $result['token'];
         $_SESSION['fc_flash_token_tenant'] = $result['tenant_hash'];
+        $_SESSION['fc_flash_kind'] = 'tenant';
         header('Location: tenant.php?id=' . $result['tenant_hash']);
         exit;
     } elseif ($action === 'delete_tenant') {
@@ -57,13 +60,17 @@ $subkeys = fcListSubkeys($tenantHash);
 $logEntries = fcLogRead($tenantHash, 100);
 
 $flashToken = null;
+$flashKind = null;
+$flashSubkeyHash = null;
 if (($_SESSION['fc_flash_token_tenant'] ?? null) === $tenantHash) {
     $flashToken = fcFlash('fc_flash_token');
     fcFlash('fc_flash_token_tenant');
+    $flashKind = fcFlash('fc_flash_kind');
+    $flashSubkeyHash = fcFlash('fc_flash_subkey_hash');
 } else {
     // Pulizia difensiva: un flash rimasto agganciato a un altro tenant
     // (es. tab lasciata aperta) non va mai mostrato qui.
-    unset($_SESSION['fc_flash_token'], $_SESSION['fc_flash_token_tenant']);
+    unset($_SESSION['fc_flash_token'], $_SESSION['fc_flash_token_tenant'], $_SESSION['fc_flash_kind'], $_SESSION['fc_flash_subkey_hash']);
 }
 
 $fcTitle = ($meta['name'] ?? 'Istanza') . ' — Fluxus Connect';
@@ -89,7 +96,7 @@ require __DIR__ . '/includes/layout_header.php';
   </div>
 </div>
 
-<?php if ($flashToken !== null): ?>
+<?php if ($flashToken !== null && $flashKind === 'tenant'): ?>
 <div class="fc-card fc-token-reveal">
   <h2>Token generato</h2>
   <p>Copialo ora: <strong>non sarà più possibile recuperarlo</strong>. Se lo perdi, potrai
@@ -267,6 +274,16 @@ require __DIR__ . '/includes/layout_header.php';
             <?php endif; ?>
           </td>
         </tr>
+        <?php if ($flashToken !== null && $flashKind === 'subkey' && ($sk['subkey_hash'] ?? null) === $flashSubkeyHash): ?>
+        <tr>
+          <td colspan="5" class="fc-token-reveal">
+            <p>Sotto-chiave per «<?= fcE($sk['name'] ?? '') ?>» generata: copiala ora,
+            <strong>non sarà più possibile recuperarla</strong>. Se la perdi, revoca questa
+            sotto-chiave e creane una nuova per la stessa console.</p>
+            <code class="fc-token"><?= fcE($flashToken) ?></code>
+          </td>
+        </tr>
+        <?php endif; ?>
         <?php endforeach; ?>
       </tbody>
     </table>

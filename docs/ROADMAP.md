@@ -79,7 +79,7 @@ scambiabile.)*
   [NOTE-TECNICHE.md](NOTE-TECNICHE.md), "Multi-registrazione", e
   [CHANGELOG.md](CHANGELOG.md).
 
-## Fase 6 — Script sul Pi *(vive in fluxus-src, non qui)*
+## Fase 6 — Script sul Pi *(vive in fluxus-src, non qui)* ✅ FATTO
 - Nuovo file di segreti sul Pi (indirizzo Connect + token, stesso
   trattamento di `.remote.conf`: separato, 0640)
 - Script di sincronizzazione — stessa struttura di `remote_sync.php` ma
@@ -89,12 +89,26 @@ scambiabile.)*
 - Va lanciato da una conversazione radicata in `fluxus-src`, non qui: usa
   come contratto l'API pubblicata dalla Fase 4/5 di questo repository.
 
-## Fase 7 — Collaudo end-to-end
+Costruito e rilasciato in `fluxus-src` come `scripts/connect_sync.php` +
+timer `fm-connect-sync.timer`, fuori dalla numerazione di fase di quel
+repository (versione `0.4.6` lì — la roadmap di Fluxus ha una propria
+"Fase 6" non correlata, "Immagine SD pronta"). Configurazione da
+pannello (card "Fluxus Connect" in Impostazioni, `0.4.8` lì, con pulsante
+"Testa connessione" verso `whoami.php`) invece del solo file manuale.
+Nessun cambio di versione qui: nessun codice scritto in questo
+repository.
+
+## Fase 7 — Collaudo end-to-end ✅ FATTO
 - Prima con richieste dirette (`curl`) al posto di una console vera, per
   isolare i problemi
 - Casi limite da provare esplicitamente: Connect irraggiungibile per un po',
   token revocato a metà sessione, comando rimasto in coda troppo a lungo
 - Richiede sia Connect (fasi 1-5) sia lo script sul Pi (fase 6) già pronti
+
+Tutti e tre i casi limite provati esplicitamente, test superati. Dal
+collaudo sono emersi e corretti alcuni bug minori nel codice di Connect,
+impatto trascurabile, nessun cambio al contratto pubblico — vedi `0.5.1`
+in [CHANGELOG.md](CHANGELOG.md).
 
 ## Fase X — Autenticazione del proprietario senza terminale ✅ FATTO
 
@@ -139,13 +153,13 @@ Implementazione scritta e collaudata: Fase 8 può ora procedere.
   `tests/login_wizard_test.php` (HTTP end-to-end: form mostrato, CSRF,
   redirect, nessuna riapertura dopo la creazione).
 
-## Fase 8 — Prima integrazione reale e rilascio ✅ FATTO (parte Connect)
+## Fase 8 — Prima integrazione reale e rilascio ✅ FATTO
 
 - Collegare una prima console esterna vera (anche minima) per validare
   l'intero flusso
-- Solo a questo punto: sezione dedicata in `docs/NOTE-TECNICHE.md` di
-  fluxus-src, ed eventuale voce nella sua `docs/ROADMAP.md` — passo
-  successivo, in una conversazione radicata lì, non ancora fatto
+- Documentato anche lato fluxus-src: sezione "Fluxus Connect" in
+  `docs/NOTE-TECNICHE.md` e voce sotto "Prima della 1.0" in
+  `docs/ROADMAP.md` di quel repository — completato.
 
 Validato con un consumatore reale (script PHP a polling, autenticato con
 una sotto-chiave `follow+control`) contro l'ambiente `fluxus-dev` già
@@ -213,6 +227,81 @@ riscritto qui, solo referenziato. Vedi `NOTE-TECNICHE.md`, sezione
 per cosa sostituisce, cosa resta intoccato, e come non confondersi con la
 vecchia versione di Remote (prodotto separato, già in produzione, che
 resta invariato).
+
+## Fase Z — Valutazione proposte API (pre-implementazione)
+
+Non numerata, come le Fasi X, Y e W: apre un processo, non lo prosegue
+linearmente. A differenza delle altre parentesi, questa non chiude nulla
+— resta aperta finché non arrivano decisioni esplicite. Regola di questa
+fase: prima si raccolgono e valutano le proposte, poi — solo dopo una
+decisione esplicita e motivata, registrata qui come già fatto per le
+Fasi X e W — si scrive codice. Nessuna implementazione nel frattempo.
+
+Ambiti aperti in valutazione, avviati in una conversazione radicata qui
+mentre si preparava l'avvio di Fluxus Remote 1.5 (Fase W):
+
+- **Strumento per provare le API esistenti** — a mano o scriptato, contro
+  un'istanza reale, prima che un consumer nuovo (Remote 1.5 o altro) ci
+  faccia affidamento. Probabilmente vive fuori da questo repository (chi
+  lo consuma), non dentro. **Deciso**: nessuno strumento nuovo. Esiste
+  già `public/docs/index.html` (Fase 5), una Swagger UI standard con
+  "Try it out" e "Authorize" attivi di default — incollando lì una
+  sotto-chiave reale si eseguono già chiamate vere sia `follow` sia
+  `control` contro un'istanza reale. Valutata e scartata l'idea di
+  un'alternativa integrata nel pannello (scelta istanza per nome invece
+  di incollare la sotto-chiave): si scontrava con un vincolo del
+  modello — dalla Fase 2 le sotto-chiavi si vedono in chiaro una sola
+  volta, il pannello dopo la creazione ha solo l'hash, quindi non può
+  "sceglierne una esistente" e usarla per conto del proprietario senza
+  un meccanismo di provisioning nuovo (sotto-chiave di prova usa-e-getta
+  o simile) che non ha un beneficio netto rispetto a quanto già offre la
+  Swagger UI pubblica. Punto chiuso, nessun codice scritto per questo.
+- **Inventario di cosa esiste già e cosa si potrebbe aggiungere** — le
+  estensioni additive e a basso rischio (nuovi campi in sola lettura,
+  nuovi endpoint follow) non toccano il modello di sicurezza e non
+  richiedono una deroga; vanno comunque proposte ed elencate qui prima di
+  scriverle.
+- **Sotto-chiave appena creata, confusione visiva col token dell'istanza**
+  (bug di presentazione emerso in questa conversazione, non un ambito
+  aperto della roadmap originaria di Fase Z, ma risolto qui perché
+  scoperto discutendo lo strumento di prova sopra) — vedi
+  `docs/CHANGELOG.md` per il dettaglio implementativo. In breve:
+  `public/tenant.php` mostrava il segreto di una sotto-chiave appena
+  creata con lo stesso banner, in cima alla pagina, usato per il token
+  dell'istanza quando lo si rigenera — stessa vetrina per due segreti
+  diversi, posizione fuorviante. Scartata l'idea di separare creazione
+  della sotto-chiave (solo nome/scope) e generazione del segreto (un
+  tasto "genera" a parte in elenco): romperebbe un'invariante attuale,
+  il nome del file su disco è l'hash del segreto stesso
+  (`fcSubkeyPath`), costringendo a un identificatore separato e a una
+  verifica del token in arrivo per scansione invece che lettura diretta
+  — cambio di modello dati, non solo di interfaccia. Fatta invece solo
+  la correzione di presentazione: il segreto appena generato per una
+  sotto-chiave appare ora dentro la sua riga nell'elenco, col nome della
+  console, mai più nel banner generico in cima (riservato solo al token
+  dell'istanza).
+- **Riapertura della decisione fissa su avvio/stop registrazione remota**
+  (decisione architetturale fissa #5 delle istruzioni locali del
+  repository; vedi anche [NOTE-TECNICHE.md](NOTE-TECNICHE.md), "Fluxus
+  Remote 1.5", che la
+  ribadisce esplicitamente: "non implementarli anche se un utente li
+  richiedesse"). **Non ancora decisa.** Riguarda l'API pubblica di
+  Connect in generale, indipendentemente da chi la consuma — non è una
+  richiesta specifica di Remote 1.5. Prima di qualunque implementazione
+  serve un motivo nuovo esplicito da parte del proprietario del progetto
+  (stesso standard di Fase X e Fase W), col raggio di danno di uno stop
+  sbagliato — non recuperabile, a differenza di un marker — pesato
+  esplicitamente nella decisione.
+
+**Sospesa per ora (2026-08-06)**: il proprietario del progetto ha deciso
+di non proseguire oltre in questa fase per il momento — non c'è
+interesse a implementare altro adesso. Le due decisioni sopra (strumento
+di prova, correzione della confusione sotto-chiave/token) restano valide
+e chiuse. L'inventario delle estensioni additive e la riapertura della
+decisione fissa #5 restano **aperti e non decisi**, non abbandonati:
+prima di scrivere altro codice su nuove proposte di API serve riprendere
+esplicitamente questa fase, stessa regola di apertura di sopra — nessuna
+ripresa implicita.
 
 ---
 
