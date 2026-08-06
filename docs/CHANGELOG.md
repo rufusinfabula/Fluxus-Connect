@@ -5,6 +5,19 @@ Sotto l'1.0 il numero di versione coincide con la fase della roadmap (vedi
 questa — che restano nella versione della fase che estendono invece di
 aprirne una nuova, quando il cambio è additivo.
 
+## Fase W — Avvio di Fluxus Remote 1.5 (decisione)
+
+Non un cambio di codice, quindi nessuna nuova versione: decisione di
+avviare, in un repository separato non ancora creato, la riscrittura di
+Fluxus Remote annunciata in "Più avanti" fin dall'impalcatura iniziale. La
+condizione posta allora (attendere un margine di uso reale di Connect dopo
+la Fase 8) è stata derogata esplicitamente dal proprietario del progetto.
+Documentazione e prompt di avvio soltanto — nessun codice applicativo
+scritto qui. Vedi [ROADMAP.md](ROADMAP.md) e
+[NOTE-TECNICHE.md](NOTE-TECNICHE.md), "Fluxus Remote 1.5 — cosa deve
+sapere la conversazione che lo costruisce", e `PROMPTS.local.md` (non
+versionato) per il prompt stesso.
+
 ## Fase Y — `whoami.php`
 
 Nuovo endpoint `GET /api/pi/whoami.php` (autenticato col token di primo

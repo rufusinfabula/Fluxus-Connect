@@ -178,20 +178,53 @@ autenticazione col token di primo livello degli altri endpoint riservati,
 revocate: una console che ha perso l'accesso non deve risultare ancora
 collegata. Vedi `public/api/pi/whoami.php`, `tests/api_test.php`.
 
+## Fase W — Avvio di Fluxus Remote 1.5 (decisione) ✅ FATTO
+
+Non numerata, come le Fasi X e Y: non prosegue linearmente questa roadmap,
+segna la decisione di avviare — in un repository separato, non ancora
+creato da questa conversazione — la riscrittura di Fluxus Remote che
+"Più avanti" (più sotto) aveva previsto fin dall'impalcatura iniziale.
+
+La condizione posta allora — "da valutare solo dopo che Connect avrà
+dimostrato affidabilità sul campo con traffico reale (dopo la Fase 8, con
+un margine di tempo d'uso vero, non subito dopo)" — è stata esplicitamente
+derogata dal proprietario del progetto in questa stessa conversazione: a
+suo giudizio la Fase 8 (validata lo stesso giorno di questa decisione,
+vedi la voce sopra) è sufficiente, senza attendere oltre. Non è
+un'interpretazione presa in autonomia da questa conversazione — è la
+scelta esplicita di chi ha l'autorità per derogare a una propria decisione
+precedente, registrata qui per lo stesso motivo per cui lo sono le altre:
+chi legge in futuro deve trovare il perché, non solo il cosa.
+
+Questa fase produce solo documentazione e un prompt di avvio — nessun
+codice applicativo scritto qui, coerente con le istruzioni locali del
+repository ("ogni fase della roadmap ha un proprio prompt... non
+anticipare fasi future scrivendo codice oltre quella in corso"). La costruzione vera è demandata a una
+conversazione nuova, radicata in `/home/pi/fluxus-remote` (cartella già
+presente ma vuota — repository ulteriore, non questa cartella né
+`fluxus-src`): prompt in `PROMPTS.local.md`, sezione "Fluxus Remote 1.5 —
+Fase 0".
+
+Il contratto che Remote 1.5 deve rispettare (API pubblica di Connect,
+autenticazione, scope, whitelist, multi-registrazione) è quello già
+documentato in `NOTE-TECNICHE.md` e in `public/docs/openapi.yaml` — non
+riscritto qui, solo referenziato. Vedi `NOTE-TECNICHE.md`, sezione
+"Fluxus Remote 1.5 — cosa deve sapere la conversazione che lo costruisce",
+per cosa sostituisce, cosa resta intoccato, e come non confondersi con la
+vecchia versione di Remote (prodotto separato, già in produzione, che
+resta invariato).
+
 ---
 
 ## Più avanti
 
-- **Fluxus Remote 1.5**: nuovo repository, riscrittura di Fluxus Remote che
-  usa l'API pubblica di Connect (come un cliente qualunque, con una propria
-  sotto-chiave) invece della propria logica di coda indipendente. Da
-  valutare solo dopo che Connect avrà dimostrato affidabilità sul campo con
-  traffico reale — non prima, per non rischiare una funzionalità già in
-  produzione. Tre opzioni erano state confrontate in fase di progettazione
-  (cliente API separato / plugin dentro Connect / fusione completa): la
-  riscrittura come cliente API resta quella consigliata quando se ne
-  riparlerà, per lo stesso motivo per cui Connect stesso non ha un
-  meccanismo di plugin.
+- **Fluxus Remote 1.5** — avviato, vedi "Fase W" sopra: nuovo repository,
+  riscrittura di Fluxus Remote che userà l'API pubblica di Connect (come un
+  cliente qualunque, con una propria sotto-chiave) invece della propria
+  logica di coda indipendente. Tre opzioni erano state confrontate in fase
+  di progettazione (cliente API separato / plugin dentro Connect / fusione
+  completa): la riscrittura come cliente API è quella scelta, per lo stesso
+  motivo per cui Connect stesso non ha un meccanismo di plugin.
 - **Avvio/stop registrazione da remoto**: resta un salto di fiducia a parte
   rispetto a marker/cue — un comando in ritardo di polling non ha, a
   differenza di un marker, un modo di essere "corretto" a posteriori.

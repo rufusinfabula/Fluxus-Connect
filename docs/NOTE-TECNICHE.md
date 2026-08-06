@@ -440,6 +440,89 @@ usare Connect — sia un **cliente dell'API pubblica** con la propria
 sotto-chiave, esattamente come qualunque console esterna. Vedi la sezione
 *Più avanti* di [ROADMAP.md](ROADMAP.md) per "Remote 1.5".
 
+## Fluxus Remote 1.5 — cosa deve sapere la conversazione che lo costruisce
+
+Decisione presa (vedi `ROADMAP.md`, "Fase W") di avviare, in un repository
+ulteriore non ancora creato da questa conversazione, la riscrittura di
+Fluxus Remote annunciata in "Più avanti" fin dall'impalcatura iniziale.
+Questa sezione fissa il contratto e i confini che quella conversazione deve
+rispettare — non decide nulla della sua architettura interna, che resta una
+scelta propria di quel repository, esattamente come questo repository ha
+fatto le proprie.
+
+### Non confondere con la vecchia versione
+
+**Fluxus Remote** (senza numero) è il relay già in produzione, altrove
+(`https://vm.spazioumano.org/fluxus-remote`), con una propria interfaccia
+web e una propria coda in un database che gestisce da sé. Resta **invariato
+e in funzione**: nessuna delle informazioni qui sotto autorizza a toccarne
+il codice, la configurazione o i dati. Sul Pi, il suo lato client è
+`scripts/remote_sync.php` (in `fluxus-src`), pilotato dal timer
+`fm-remote-sync.timer` (ogni 5s) e dai segreti in
+`/etc/fluxus/<istanza>.remote.conf` (`FLUXUS_REMOTE_URL`,
+`FLUXUS_REMOTE_API_KEY`, `FLUXUS_NODE_NAME`) — anche questi restano
+invariati. Un'istanza Fluxus può avere Remote (vecchio) e Connect attivi
+insieme, come due integrazioni indipendenti: passare un'istanza dal vecchio
+Remote al nuovo è una decisione operativa separata, fuori dallo scopo di
+questa fase.
+
+**Fluxus Remote 1.5** è un prodotto nuovo, in un repository nuovo, che non
+tocca né sostituisce nulla di quanto sopra sul momento — è pensato per
+poterlo affiancare, e solo eventualmente rimpiazzare in futuro, a
+migrazione decisa altrove.
+
+### Cosa faceva il vecchio Remote, per riferimento sulle funzionalità
+
+Non da copiare, solo da tenere a mente per non perdere capacità già offerte
+agli utenti. Il vecchio relay espone (lato Pi, consumato da
+`remote_sync.php`): `POST /api/sync` (il Pi invia `node_name` e l'elenco
+delle registrazioni attive), `GET /api/queue?status=pending` (coda di
+marker/cue creati da un pulsante nell'interfaccia del relay, con
+`id`, `recording_id`, `type`, `label`, `created_at`), `POST /api/queue/ack`
+(conferma degli id elaborati). Lato umano, un'interfaccia web mostra le
+registrazioni attive e una "pulsantiera" per depositare marker/cue — è
+questa esperienza, non questo protocollo, che Remote 1.5 deve replicare.
+
+### Cosa cambia con Remote 1.5: nessuna coda propria, cliente di Connect
+
+Il Pi **non ha bisogno di alcun nuovo codice per Remote 1.5**: il suo lato
+è già `scripts/connect_sync.php` (Fase 6, già scritto e collaudato in
+Fase 7-8), che parla con Connect ogni 2s indipendentemente da qualunque
+console lo consumi. Remote 1.5 si collega da fuori, come una console
+qualunque:
+
+- **Autenticazione**: una sotto-chiave emessa dal pannello di
+  amministrazione di *questa* installazione di Connect, per il tenant
+  (Pi) che Remote 1.5 deve seguire — scope `follow` se serve solo la
+  vista di stato, `follow+control` se deve anche depositare marker/cue.
+  Nessun token di primo livello del Pi: quello resta esclusivo dell'API
+  riservata (`/api/pi/...`).
+- **Lettura di stato**: `GET /api/v1/follow/status.php` — restituisce
+  `registrations` (array, può contenere più di una registrazione attiva
+  insieme: vedi "Multi-registrazione" sopra). Remote 1.5 non deve
+  assumere una sola registrazione per Pi: se ce n'è più di una, chi preme
+  il pulsante deve poter scegliere a quale si riferisce.
+- **Deposito comandi**: `POST /api/v1/control/commands.php`, whitelist
+  stretta `type` ∈ {`marker`, `cue`}, `target_id` obbligatorio se più di
+  una registrazione è attiva (l'`id` va preso da `registrations`, mai
+  indovinato o scelto euristicamente da Remote 1.5 stesso). Avvio/stop
+  restano PENDING/FUTURO — non implementarli anche se un utente li
+  richiedesse, stesso limite già fissato per l'API pubblica in generale.
+- **Contratto autorevole**: `public/docs/openapi.yaml` di questo
+  repository (navigabile anche come Swagger UI in `public/docs/`) — non
+  indovinare la forma delle richieste/risposte, è già documentata e
+  collaudata.
+
+Conseguenza architetturale: Remote 1.5 non ha più bisogno di una propria
+coda persistente né di conoscere lo stato delle registrazioni per conto
+proprio — quella responsabilità è già di Connect. Cosa resta comunque una
+decisione propria del nuovo repository, non fissata qui: come Remote 1.5
+autentica gli *umani* che premono i suoi pulsanti (il proprio pannello di
+accesso), se e come conserva una propria configurazione per sapere quale
+sotto-chiave/tenant seguire, e ogni altra scelta di implementazione — sullo
+stesso principio per cui questo repository non ha deciso l'architettura
+interna di `fluxus-src` né viceversa.
+
 ## Tabella riassuntiva del modello di sicurezza
 
 | Combinazione | Meccanismo | Fiducia richiesta | Raggio di danno se compromessa |
