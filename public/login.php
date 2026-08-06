@@ -61,6 +61,7 @@ if (!$ownerExists) {
     require __DIR__ . '/includes/layout_header.php';
     ?>
     <div class="fc-card fc-card-narrow">
+      <img class="fc-auth-logo" src="icons/fluxus-connect-120.png" alt="Fluxus Connect">
       <h1>Crea il proprietario del pannello</h1>
       <p class="fc-muted">Nessun proprietario è ancora configurato: la prima creazione valida diventa l'unico account del pannello.</p>
       <?php if ($error): ?>
@@ -107,6 +108,7 @@ $fcTitle = 'Accedi — Fluxus Connect';
 require __DIR__ . '/includes/layout_header.php';
 ?>
 <div class="fc-card fc-card-narrow">
+  <img class="fc-auth-logo" src="icons/fluxus-connect-120.png" alt="Fluxus Connect">
   <h1>Accedi</h1>
   <?php if ($error): ?>
     <p class="fc-alert"><?= fcE($error) ?></p>

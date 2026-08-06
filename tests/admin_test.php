@@ -126,6 +126,42 @@ fcCheck('la voce più vecchia è la creazione del tenant', end($logEntries)['eve
 fcCheck('il limite di fcLogRead viene rispettato', count(fcLogRead($tenantHash, 2)) === 2);
 fcCheck('nessuna attività per un tenant senza log', fcLogRead(str_repeat('0', 64)) === []);
 
+// --- Rigenerazione token e cancellazione -------------------------------------
+
+echo "\nRigenerazione token e cancellazione:\n";
+
+$regenTarget = fcCreateTenant('Da rigenerare');
+$regenOldHash = $regenTarget['tenant_hash'];
+fcCreateSubkey($regenOldHash, 'Console superstite', 'follow');
+
+$regenResult = fcRegenerateTenantToken($regenOldHash);
+fcCheck('la rigenerazione restituisce un nuovo token da 64 esadecimali', (bool) preg_match('/^[0-9a-f]{64}$/', $regenResult['token']));
+fcCheck('il nuovo hash è diverso dal precedente', $regenResult['tenant_hash'] !== $regenOldHash);
+fcCheck('il vecchio hash non esiste più', !fcTenantExists($regenOldHash));
+fcCheck('il nuovo hash esiste', fcTenantExists($regenResult['tenant_hash']));
+
+$regenMeta = fcReadTenantMeta($regenResult['tenant_hash']);
+fcCheck('il nome resta invariato dopo la rigenerazione', $regenMeta['name'] === 'Da rigenerare');
+fcCheck('meta.json riporta il nuovo token_hash', $regenMeta['token_hash'] === $regenResult['tenant_hash']);
+
+$survivedSubkeys = fcListSubkeys($regenResult['tenant_hash']);
+fcCheck(
+    'le sotto-chiavi sopravvivono alla rigenerazione',
+    count($survivedSubkeys) === 1 && $survivedSubkeys[0]['name'] === 'Console superstite'
+);
+
+try {
+    fcRegenerateTenantToken(str_repeat('0', 64));
+    fcCheck('rigenerazione su tenant inesistente rifiutata', false);
+} catch (InvalidArgumentException $e) {
+    fcCheck('rigenerazione su tenant inesistente rifiutata', true);
+}
+
+$deleteTarget = fcCreateTenant('Da eliminare');
+fcCheck('eliminazione di un tenant esistente riesce', fcDeleteTenant($deleteTarget['tenant_hash']) === true);
+fcCheck('il tenant eliminato non esiste più', !fcTenantExists($deleteTarget['tenant_hash']));
+fcCheck('eliminazione idempotente (secondo tentativo: false)', fcDeleteTenant($deleteTarget['tenant_hash']) === false);
+
 // --- Proprietario ---------------------------------------------------------------
 
 echo "\nProprietario:\n";

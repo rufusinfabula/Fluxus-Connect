@@ -66,6 +66,71 @@ function fcTenantExists(string $tenantHash): bool
     return fcReadTenantMeta($tenantHash) !== null;
 }
 
+// Rigenera il token di un tenant esistente: nome, sotto-chiavi, coda e log
+// restano intatti, solo il token di primo livello cambia (e con esso
+// l'hash che nomina la sua cartella — le sotto-chiavi non lo referenziano
+// mai direttamente, vengono ritrovate per scansione da fcFindSubkeyTenant,
+// quindi il rename non richiede altri aggiornamenti). Serve per il caso in
+// cui il token mostrato una sola volta va perso: l'alternativa sarebbe
+// cancellare il tenant e ricrearlo, perdendo sotto-chiavi e log.
+function fcRegenerateTenantToken(string $tenantHash): array
+{
+    $meta = fcReadTenantMeta($tenantHash);
+    if ($meta === null) {
+        throw new InvalidArgumentException('tenant inesistente');
+    }
+
+    $token = fcGenerateToken();
+    $newHash = fcHashToken($token);
+
+    if (is_dir(fcTenantDir($newHash))) {
+        throw new RuntimeException('collisione di token rigenerando il tenant, riprovare');
+    }
+
+    $meta['token_hash'] = $newHash;
+    fcAtomicWriteFile(
+        fcTenantMetaPath($tenantHash),
+        json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)
+    );
+
+    if (!rename(fcTenantDir($tenantHash), fcTenantDir($newHash))) {
+        throw new RuntimeException('impossibile rinominare la cartella del tenant durante la rigenerazione del token');
+    }
+
+    fcLogAppend($newHash, 'tenant_token_regenerated', ['name' => $meta['name'] ?? null]);
+
+    return ['token' => $token, 'tenant_hash' => $newHash, 'name' => $meta['name'] ?? ''];
+}
+
+// Cancella un tenant e tutto ciò che contiene (sotto-chiavi, coda, log) —
+// irreversibile, nessun modo di recuperarlo dopo. Idempotente: cancellare
+// un tenant già assente non è un errore, il risultato voluto (nessun
+// tenant con questo hash) è comunque raggiunto.
+function fcDeleteTenant(string $tenantHash): bool
+{
+    if (!fcTenantExists($tenantHash)) {
+        return false;
+    }
+    fcDeleteDirRecursive(fcTenantDir($tenantHash));
+    return true;
+}
+
+function fcDeleteDirRecursive(string $dir): void
+{
+    foreach (scandir($dir) ?: [] as $entry) {
+        if ($entry === '.' || $entry === '..') {
+            continue;
+        }
+        $path = $dir . '/' . $entry;
+        if (is_dir($path)) {
+            fcDeleteDirRecursive($path);
+        } else {
+            unlink($path);
+        }
+    }
+    rmdir($dir);
+}
+
 // Elenco di tutti i tenant, più recenti prima — per la dashboard del
 // pannello.
 function fcListTenants(): array

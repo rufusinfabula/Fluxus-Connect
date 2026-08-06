@@ -9,9 +9,9 @@ fcRequireLogin();
 $tenantHash = (string) ($_GET['id'] ?? '');
 if (!preg_match('/^[0-9a-f]{64}$/', $tenantHash) || !fcTenantExists($tenantHash)) {
     http_response_code(404);
-    $fcTitle = 'Non trovato — Fluxus Connect';
+    $fcTitle = 'Non trovata — Fluxus Connect';
     require __DIR__ . '/includes/layout_header.php';
-    echo '<div class="fc-card"><h1>Pi non trovato</h1><p><a href="dashboard.php">Torna al pannello</a></p></div>';
+    echo '<div class="fc-card"><h1>Istanza non trovata</h1><p><a href="dashboard.php">Torna al pannello</a></p></div>';
     require __DIR__ . '/includes/layout_footer.php';
     exit;
 }
@@ -39,6 +39,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         header('Location: tenant.php?id=' . $tenantHash);
         exit;
+    } elseif ($action === 'regenerate_token') {
+        $result = fcRegenerateTenantToken($tenantHash);
+        $_SESSION['fc_flash_token'] = $result['token'];
+        $_SESSION['fc_flash_token_tenant'] = $result['tenant_hash'];
+        header('Location: tenant.php?id=' . $result['tenant_hash']);
+        exit;
+    } elseif ($action === 'delete_tenant') {
+        fcDeleteTenant($tenantHash);
+        header('Location: dashboard.php');
+        exit;
     }
 }
 
@@ -56,20 +66,33 @@ if (($_SESSION['fc_flash_token_tenant'] ?? null) === $tenantHash) {
     unset($_SESSION['fc_flash_token'], $_SESSION['fc_flash_token_tenant']);
 }
 
-$fcTitle = ($meta['name'] ?? 'Pi') . ' — Fluxus Connect';
+$fcTitle = ($meta['name'] ?? 'Istanza') . ' — Fluxus Connect';
 require __DIR__ . '/includes/layout_header.php';
 ?>
-<p><a href="dashboard.php">&larr; Tutti i Pi</a></p>
+<p><a href="dashboard.php">&larr; Tutte le istanze</a></p>
 <div class="fc-card">
   <h1><?= fcE($meta['name'] ?? '') ?></h1>
-  <p class="fc-muted">Creato il <?= fcE($meta['created_at'] ?? '') ?></p>
+  <p class="fc-muted">Creata il <?= fcE($meta['created_at'] ?? '') ?></p>
+  <div class="fc-actions">
+    <form method="post" onsubmit="return confirm('Rigenerare il token di questa istanza? Il token attuale smetterà subito di funzionare: aggiornalo anche sul Pi.');">
+      <?= fcCsrfField() ?>
+      <input type="hidden" name="action" value="regenerate_token">
+      <button type="submit" class="fc-button">Rigenera token</button>
+    </form>
+    <form method="post" onsubmit="return confirm('Eliminare questa istanza? Token, sotto-chiavi, coda e log andranno persi per sempre.');">
+      <?= fcCsrfField() ?>
+      <input type="hidden" name="action" value="delete_tenant">
+      <button type="submit" class="fc-link-button fc-danger">Elimina istanza</button>
+    </form>
+  </div>
 </div>
 
 <?php if ($flashToken !== null): ?>
 <div class="fc-card fc-token-reveal">
   <h2>Token generato</h2>
-  <p>Copialo ora: <strong>non sarà più possibile recuperarlo</strong>. Se lo perdi, dovrai
-  creare un nuovo Pi (per il token del Pi) o revocare e ricreare la sotto-chiave (per una console).</p>
+  <p>Copialo ora: <strong>non sarà più possibile recuperarlo</strong>. Se lo perdi, potrai
+  sempre rigenerarlo da qui sotto (invalida il precedente) senza perdere sotto-chiavi, coda
+  e log — o revocare e ricreare la sotto-chiave, per una singola console.</p>
   <code class="fc-token"><?= fcE($flashToken) ?></code>
 </div>
 <?php endif; ?>

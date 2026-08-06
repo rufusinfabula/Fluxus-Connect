@@ -243,7 +243,7 @@ $createdAt = $owner['created_at'];
 // cookie senza rifare il login.
 [$status, $body] = fcHttpRequest('GET', "http://{$host}/dashboard.php", ["Cookie: {$cookieB}"]);
 fcCheck('login automatico riuscito: dashboard.php raggiungibile subito dopo', $status === 200);
-fcCheck('dashboard.php mostra il pannello autenticato', str_contains($body, 'Pi registrati'));
+fcCheck('dashboard.php mostra il pannello autenticato', str_contains($body, 'Istanze registrate'));
 
 // --- Dopo la creazione: la stessa rotta mostra login, non più creazione ----
 
